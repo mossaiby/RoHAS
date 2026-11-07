@@ -111,6 +111,9 @@ python qwen25_quad_space_engine.py --model <hf-model-id>
 ```
 
 The paper (`paper/main.tex`, `paper/main.pdf`) evaluates `qwen25_quad_space_engine.py`.
+Its arithmetic atoms (`+ - * /`, comparison) are hand-weighted transformers in `circuits/`
+(no trained weights, no Python arithmetic); check them with `python tests/test_circuits.py`.
+The research and benchmark plan is in `docs/research_plan.md`.
 Earlier development scripts (hand-weighted adder, GPT-2 single/tri/quad-space engines, gate-training iterations v1–v5) are archived in `misc/`.
 The traces below come from the earlier GPT-2 engine (`misc/atom_space_engine.py`).
 

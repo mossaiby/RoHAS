@@ -13,14 +13,16 @@ Supports:
 import sys
 import argparse
 import random
-from decimal import Decimal, getcontext
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-getcontext().prec = 100
+from circuits import arith   # hand-weighted transformer circuits for + - * / and comparison
+
+DIV_PLACES = 6      # '/' truncates to this many fractional digits
+EXPERT_C = 100.0    # certified-token logit of an arithmetic atom (+C on it, -C elsewhere)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Executing Quad-Space Engine on: {device}")
 
@@ -93,9 +95,12 @@ CLASS_CMP    = 4
 CLASS_MUL    = 5
 CLASS_CORPUS = 6
 CLASS_TOOL   = 7
+CLASS_DIV    = 8
 
-CLASS_NAMES = ["Base", "Null", "+", "-", "cmp", "*", "Corpus", "Tool"]
+CLASS_NAMES = ["Base", "Null", "+", "-", "cmp", "*", "Corpus", "Tool", "/"]
 NUM_CLASSES = len(CLASS_NAMES)
+MATH_OPS = ["+", "-", "cmp", "*", "/"]
+CMP_OPS = [">", "<", ">=", "<=", "==", "!="]
 
 
 # -----------------------------------------------------------------------------
@@ -230,77 +235,20 @@ class CorpusAtomSpace:
 # -----------------------------------------------------------------------------
 # 5. Parametric Specialist Atoms (Omega_params)
 # -----------------------------------------------------------------------------
-class EmbeddedTransformerAdder:
-    VOCAB = list("0123456789.+= ^$")
-    tok = {c: i for i, c in enumerate(VOCAB)}
+class CircuitAtom:
+    """omega_op in Omega_params: a hand-weighted transformer (circuits/) evaluates
+    `a op b`; its answer is then streamed into the LM's token stream one character
+    per step. No Python arithmetic is involved (see circuits/arith.py)."""
 
-    @staticmethod
-    def pad(a: str, b: str):
-        def split_num(s):
-            parts = s.split(".")
-            return parts[0], parts[1] if len(parts) > 1 else ""
-        ai, af = split_num(a)
-        bi, bf = split_num(b)
-        max_i, max_f = max(len(ai), len(bi)), max(len(af), len(bf))
-        pa = ai.zfill(max_i) + ("." + af.ljust(max_f, "0") if max_f > 0 else "")
-        pb = bi.zfill(max_i) + ("." + bf.ljust(max_f, "0") if max_f > 0 else "")
-        return pa, pb
+    def __init__(self, a: str, op: str, b: str):
+        self.target = " " + arith.evaluate(a, op, b, places=DIV_PLACES)
+        self.idx = 0
 
-    @classmethod
-    def evaluate_next(cls, ids: list) -> tuple:
-        prompt_str = "".join([cls.VOCAB[i] for i in ids])
-        eq_idx = prompt_str.index("=")
-        eq_part = prompt_str[1:eq_idx].strip()
-        parts = eq_part.split("+")
-        pa, pb = parts[0].strip(), parts[1].strip()
-
-        sum_dec = Decimal(pa) + Decimal(pb)
-        ans_str = f" {sum_dec:f}"
-        if "." in pa:
-            ans_str = f" {sum_dec:.{len(pa.split('.')[1])}f}"
-
-        generated = prompt_str[eq_idx + 1:]
-        logits = np.full(len(cls.VOCAB), -20.0, dtype=np.float32)
-
-        if len(generated) < len(ans_str):
-            target = ans_str[len(generated)]
-            logits[cls.tok[target]] = 10.0
-            return logits, target
-        else:
-            logits[cls.tok["$"]] = 10.0
-            return logits, "$"
-
-
-class UnifiedMathEngine:
-    @staticmethod
-    def step_add(session: dict):
-        _, char = EmbeddedTransformerAdder.evaluate_next(session["ids"])
-        if char == "$": return None
-        session["ids"].append(EmbeddedTransformerAdder.tok[char])
-        return char
-
-    @staticmethod
-    def step_sub(session: dict):
-        if session["idx"] < len(session["target"]):
-            char = session["target"][session["idx"]]
-            session["idx"] += 1
-            return char
-        return None
-
-    @staticmethod
-    def step_cmp(session: dict):
-        if session["idx"] < len(session["target"]):
-            char = session["target"][session["idx"]]
-            session["idx"] += 1
-            return char
-        return None
-
-    @staticmethod
-    def step_mul(session: dict):
-        if session["idx"] < len(session["target"]):
-            char = session["target"][session["idx"]]
-            session["idx"] += 1
-            return char
+    def next_char(self):
+        if self.idx < len(self.target):
+            ch = self.target[self.idx]
+            self.idx += 1
+            return ch
         return None
 
 
@@ -373,23 +321,13 @@ def generate_training_data(num_samples=600):
             token_labels = [CLASS_BASE] * len(input_ids)
             dataset.append((input_ids, token_labels, -1))
         else:
-            op_choice = random.choice(["+", "-", ">", "*"])
+            op_choice = random.choice(["+", "-", ">", "*", "/"])
             a_raw, b_raw = random.uniform(1.0, 99.0), random.uniform(1.0, 99.0)
             a_str, b_str = format_num(a_raw), format_num(b_raw)
-            a_dec, b_dec = Decimal(a_str), Decimal(b_str)
 
-            if op_choice == "+":
-                cls_id = CLASS_ADD
-                ans_str = f" {a_dec + b_dec:f}"
-            elif op_choice == "-":
-                cls_id = CLASS_SUB
-                ans_str = f" {a_dec - b_dec:f}"
-            elif op_choice == ">":
-                cls_id = CLASS_CMP
-                ans_str = f" {str(a_dec > b_dec)}"
-            else:
-                cls_id = CLASS_MUL
-                ans_str = f" {a_dec * b_dec:f}"
+            cls_id = {"+": CLASS_ADD, "-": CLASS_SUB, ">": CLASS_CMP,
+                      "*": CLASS_MUL, "/": CLASS_DIV}[op_choice]
+            ans_str = " " + arith.evaluate(a_str, op_choice, b_str, places=DIV_PLACES)
 
             prefix_text = random.choice(prefixes) + f"{a_str} {op_choice} {b_str} ="
             suffix_text = random.choice(suffixes)
@@ -416,7 +354,7 @@ def train_gate(epochs=3, batch_size=4, lr=1e-3):
 
     gate = TriScaleAtomGate(d_in=D_MODEL * 3).to(device)
     optimizer = torch.optim.AdamW(gate.parameters(), lr=lr, weight_decay=1e-2)
-    weights = torch.tensor([0.25, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], device=device)
+    weights = torch.tensor([0.25, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], device=device)
 
     print(f"Training gate ({D_MODEL * 3} -> 256 -> {NUM_CLASSES}) on {len(train_data)} sequences...")
     gate.train()
@@ -521,7 +459,7 @@ class QuadSpaceInferenceEngine:
                         lambdas = torch.softmax(gate_logits / self.tau, dim=-1).cpu().numpy()
 
                     predicted_atom = CLASS_NAMES[int(lambdas.argmax())]
-                    if predicted_atom in ["+", "-", "cmp", "*"]:
+                    if predicted_atom in MATH_OPS:
                         active_atom_type = predicted_atom
 
                 elif tool_val is not None:
@@ -557,62 +495,29 @@ class QuadSpaceInferenceEngine:
                     active_session = None
                     active_atom_type = None
 
-            elif active_atom_type == "+":
+            elif active_atom_type in MATH_OPS:
                 if active_session is None:
                     sub = context.split("=")[0].split()
-                    a, b = sub[-3], sub[-1]
-                    pa, pb = EmbeddedTransformerAdder.pad(a, b)
-                    active_session = {"ids": [EmbeddedTransformerAdder.tok[c] for c in f"^{pa} + {pb} ="]}
+                    a_str, op_str, b_str = sub[-3], sub[-2], sub[-1]
+                    if active_atom_type == "cmp" and op_str not in CMP_OPS:
+                        op_str = ">"
+                    active_session = CircuitAtom(a_str, op_str, b_str)
 
-                target_char = UnifiedMathEngine.step_add(active_session)
+                target_char = active_session.next_char()
                 if target_char is None:
                     active_session = None
                     active_atom_type = None
                     equation_consumed = True
 
-            elif active_atom_type == "-":
-                if active_session is None:
-                    sub = context.split("=")[0].split()
-                    a, b = Decimal(sub[-3]), Decimal(sub[-1])
-                    diff_str = f" {a - b:f}"
-                    active_session = {"target": diff_str, "idx": 0}
-
-                target_char = UnifiedMathEngine.step_sub(active_session)
-                if target_char is None:
-                    active_session = None
-                    active_atom_type = None
-                    equation_consumed = True
-
-            elif active_atom_type == "cmp":
-                if active_session is None:
-                    sub = context.split("=")[0].split()
-                    a, b = Decimal(sub[-3]), Decimal(sub[-1])
-                    res_str = f" {str(a > b)}"
-                    active_session = {"target": res_str, "idx": 0}
-
-                target_char = UnifiedMathEngine.step_cmp(active_session)
-                if target_char is None:
-                    active_session = None
-                    active_atom_type = None
-                    equation_consumed = True
-
-            elif active_atom_type == "*":
-                if active_session is None:
-                    sub = context.split("=")[0].split()
-                    a, b = Decimal(sub[-3]), Decimal(sub[-1])
-                    prod_str = f" {a * b:f}"
-                    active_session = {"target": prod_str, "idx": 0}
-
-                target_char = UnifiedMathEngine.step_mul(active_session)
-                if target_char is None:
-                    active_session = None
-                    active_atom_type = None
-                    equation_consumed = True
-
-            # Token Selection
+            # Token Selection: Level B logit blending,
+            #   l_comb = sum_w lambda_w * l_w,  l_expert = +C on the certified token, -C elsewhere
             if target_char is not None:
                 tok_id = tokenizer.encode(target_char, add_special_tokens=False)[0]
-                next_tok_id = tok_id
+                expert_logits = np.full_like(base_logits, -EXPERT_C)
+                expert_logits[tok_id] = EXPERT_C
+                lam_expert = float(lambdas[CLASS_NAMES.index(predicted_atom)])
+                combined = (1.0 - lam_expert) * base_logits + lam_expert * expert_logits
+                next_tok_id = int(combined.argmax())
             else:
                 next_tok_id = int(base_logits.argmax())
                 lambdas = np.zeros(NUM_CLASSES)
@@ -657,6 +562,10 @@ if __name__ == "__main__":
 
     print("\n--- TEST 2: FULL QUAD-SPACE SYNERGY ---")
     engine.generate("Telemetry delta calculation: 978.20 - 960.50 =", max_tokens=10)
+
+    print("\n--- TEST 2b: COMPILED MULTIPLICATION AND DIVISION ---")
+    engine.generate("Power check: 12.5 * 2.04 =", max_tokens=10)
+    engine.generate("Average rate: 22.5 / 7 =", max_tokens=12)
 
     print("\n--- TEST 3: TOOL REVOCATION (ANTI-ATOM) ---")
     tools.revoke_tool("MunichBarometerAPI")
