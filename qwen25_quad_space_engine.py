@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from circuits import arith   # hand-weighted transformer circuits for + - * / and comparison
+from circuits import arith, parser   # hand-weighted transformer circuits: + - * /, comparison, expressions
 
 DIV_PLACES = 6      # '/' truncates to this many fractional digits
 EXPERT_C = 100.0    # certified-token logit of an arithmetic atom (+C on it, -C elsewhere)
@@ -235,13 +235,34 @@ class CorpusAtomSpace:
 # -----------------------------------------------------------------------------
 # 5. Parametric Specialist Atoms (Omega_params)
 # -----------------------------------------------------------------------------
-class CircuitAtom:
-    """omega_op in Omega_params: a hand-weighted transformer (circuits/) evaluates
-    `a op b`; its answer is then streamed into the LM's token stream one character
-    per step. No Python arithmetic is involved (see circuits/arith.py)."""
+EXPR_CHARS = set("0123456789.+-*/() ")
 
-    def __init__(self, a: str, op: str, b: str):
-        self.target = " " + arith.evaluate(a, op, b, places=DIV_PLACES)
+
+def trailing_expression(text: str) -> str:
+    """The arithmetic expression that ends `text` (the prompt up to its final '=')."""
+    i = len(text)
+    while i > 0 and text[i - 1] in EXPR_CHARS:
+        i -= 1
+    return text[i:].strip().lstrip("+*/)").strip()
+
+
+class CircuitAtom:
+    """omega_op in Omega_params: hand-weighted transformers (circuits/) evaluate the
+    expression before '='; the answer is then streamed into the LM's token stream one
+    character per step. Arithmetic expressions go to the parser atom, which calls the
+    + - * / atoms per operation; comparisons go to the comparison atom. No Python
+    arithmetic is involved (see circuits/arith.py and circuits/parser.py)."""
+
+    def __init__(self, lhs: str, is_cmp: bool):
+        if is_cmp:
+            parts = lhs.split()
+            a, op, b = parts[-3], parts[-2], parts[-1]
+            if op not in CMP_OPS:
+                op = ">"
+            result = arith.evaluate(a, op, b)
+        else:
+            result = parser.evaluate(trailing_expression(lhs), places=DIV_PLACES)
+        self.target = " " + result
         self.idx = 0
 
     def next_char(self):
@@ -497,12 +518,15 @@ class QuadSpaceInferenceEngine:
 
             elif active_atom_type in MATH_OPS:
                 if active_session is None:
-                    sub = context.split("=")[0].split()
-                    a_str, op_str, b_str = sub[-3], sub[-2], sub[-1]
-                    if active_atom_type == "cmp" and op_str not in CMP_OPS:
-                        op_str = ">"
-                    active_session = CircuitAtom(a_str, op_str, b_str)
+                    lhs = context.rstrip()[:-1]            # everything before the final '='
+                    try:
+                        active_session = CircuitAtom(lhs, is_cmp=(active_atom_type == "cmp"))
+                    except (ValueError, IndexError, RuntimeError, ZeroDivisionError) as err:
+                        print(f"  [atom abstains: {err}]")  # no parsable expression: base LM continues
+                        active_atom_type = None
+                        equation_consumed = True
 
+            if active_atom_type in MATH_OPS:
                 target_char = active_session.next_char()
                 if target_char is None:
                     active_session = None
@@ -566,6 +590,9 @@ if __name__ == "__main__":
     print("\n--- TEST 2b: COMPILED MULTIPLICATION AND DIVISION ---")
     engine.generate("Power check: 12.5 * 2.04 =", max_tokens=10)
     engine.generate("Average rate: 22.5 / 7 =", max_tokens=12)
+
+    print("\n--- TEST 2c: EXPRESSION PARSER ATOM (calls the arithmetic atoms) ---")
+    engine.generate("Corrected delta: -(978.20 - 960.50) * 2 / (4 - 6) =", max_tokens=12)
 
     print("\n--- TEST 3: TOOL REVOCATION (ANTI-ATOM) ---")
     tools.revoke_tool("MunichBarometerAPI")

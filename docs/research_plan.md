@@ -32,6 +32,7 @@ training cost and exact length generalisation.
 | Routing whole queries to models | Zooter, LLM-Blender, Mixture-of-Agents | These route per query, not per token. |
 | Compiled / hand-written transformers | RASP (Weiss et al. 2021), Tracr (Lindner et al. 2023), weight-space programming (Takehi et al. 2026) | Here compiled circuits run as experts *inside* an LLM's decoding loop. |
 | Arithmetic in transformers | Abacus embeddings (McLeish et al. 2024), scratchpads, PAL / PoT, Toolformer | A compiled expert vs a trained arithmetic expert vs a Python tool. |
+| Tools as first-class output elements | ToolkenGPT (Hao et al. 2023), ToolGen (Wang et al. 2024); Toolformer, ReAct, Gorilla, ToolLLM; grammar/JSON-constrained function calling | One-token-per-tool is not new, so do not claim "tools as atoms" itself. The claim is that tools sit in the same calibrated read as memory and parameter experts: one gate across spaces, a null atom for "no tool fits", anti-atom revocation, fallback to memory under the margin certificate, and atoms calling atoms (the parser atom). |
 | Editing / unlearning | ROME, MEMIT, GRACE, SERAC, WISE; TOFU (Maini et al. 2024) | The frozen-hardware setting; logit- and hidden-level anti-atoms. |
 
 ## 3. Experiments
@@ -52,6 +53,14 @@ models of 1.5B parameters or less; D is sized for it.
   mul 310k / 7.3k, div 100k / 4.2k),
   scratchpad tokens per operation (mul ≈ m·(2n+3m+1), div ≈ 11n·(2n+m+4) at worst), and
   wall-clock time.
+
+- **Experts calling experts:** the parser atom (`circuits/parser.py`) is itself a compiled
+  transformer. It finds the innermost group and the operator with the highest precedence
+  without counting brackets, then emits a call block that the latch routes to the
+  arithmetic atoms. Report rows and tokens against expression size and nesting depth
+  (depth-5 balanced trees: 31 calls, about 5.5k tokens), and test against a reference
+  evaluator with identical truncating-division semantics (`tests/test_parser.py`). This
+  is the first step from "arithmetic expert" toward the "compiled program" direction.
 
 ### B. Pretrained experts that share a tokenizer (main experiment for H1 and H2)
 
@@ -127,6 +136,33 @@ observable at the last hidden state or only at the logits.
   Compare append-plus-cancel against append-only.
 - Report the inference overhead per query and the storage per removed fact.
 
+### D2. Tools in the same read (Ω_tools)
+
+The current engine routes tools with an if/else on similarity and a constant mock
+barometer, so it is an illustration, not evidence. To make it evidence:
+
+- **Routing:** tool selection goes through the learned gate λ(x), together with corpus,
+  parameter and null atoms; tool keys are unit-normalised embeddings of tool
+  descriptions, as for corpus records.
+- **Choosing a tool:** API-Bank or ToolBench (pick the right tool and arguments among many).
+  Baselines: prompt-based function calling with the same base model, a
+  ToolkenGPT-style learned tool-token head, and retrieve-then-call (Gorilla/ToolLLM-style
+  retriever).
+- **Abstention:** the BFCL irrelevance-detection category (no listed tool fits). It tests
+  the null atom directly; report the calibrated θ from held-out data, as in RoAS.
+- **Revocation:** revoke k of N tools by anti-atom vs by removal from an allowlist.
+  Measure calls to revoked tools (should be 0), what near-miss queries receive instead
+  (abstention vs a wrong neighbouring tool, the anti-atom vs deletion difference of
+  RoAS Proposition 3), and reversibility.
+- **Fallback chain:** tool → stored record → abstain. Measure how often the margin
+  certificate covers the fallback and how often the fallback answer is correct.
+- **Security:** if claimed, AgentDojo (prompt injections delivered through tool outputs),
+  comparing revocation and gating against prompt-level defences.
+- **Atoms calling atoms:** the parser atom's calls to the arithmetic atoms are a small,
+  exactly checkable instance of nested tool use. Report call counts and correctness
+  against the reference evaluator, and use it as the controlled case before nested calls
+  between real tools.
+
 ### E. Ablations (for the paper's mechanism claims)
 
 Gate input (last hidden state / mean / max / all three), window size W, session latching
@@ -144,7 +180,7 @@ and memory per token with k experts (dense, or sparse with skipping when λ = 0)
 
 1. Track C (from scratch). It is cheap, controlled, and directly tests the data-type claim.
 2. Track B with two experts (language + code) before adding math, the circuits and facts.
-3. Track D on TOFU.
+3. Track D on TOFU, then the tools track D2 (BFCL irrelevance, revocation, fallback).
 4. Track A as a short section on compiled experts plus length generalisation.
 
 ## 5. Ideas from weight-space programming (Takehi et al., 2026)
