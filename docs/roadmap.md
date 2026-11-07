@@ -111,6 +111,6 @@ and the mock barometer experiment.
 | Tracks B, C, D, D2, ablations | not started |
 | Draft | outline, abstract skeleton, Related Work and Section 4 written; Sections 5–9 are TODO skeletons |
 
-Reproduce Track A: `python experiments/track_a/run_correctness.py` (plus `--suite exhaustive3`, about 4.5 h on 15 workers),
+Reproduce Track A: `python experiments/track_a/run_correctness.py` (plus `--suite exhaustive3`, roughly 2.5 h on 15 workers; the recorded time includes a 2 h hibernation),
 `python experiments/track_a/run_length_generalisation.py --systems compiled python qwen0.5b qwen1.5b`,
 `python experiments/track_a/run_cost.py`, then `python scripts/make_tables.py` and `latexmk -pdf main_v2.tex` in `paper/`.

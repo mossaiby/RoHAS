@@ -1,7 +1,7 @@
 """Track A: correctness of the compiled circuits and the parser atom.
 
     python experiments/track_a/run_correctness.py                 # all quick suites
-    python experiments/track_a/run_correctness.py --suite exhaustive3   # ~4.5 h on 15 workers
+    python experiments/track_a/run_correctness.py --suite exhaustive3   # ~2.5 h on 15 workers
 
 Suites (each adds/replaces its rows in results/track_a/correctness.json):
   exhaustive2   every pair of integers 0..99 (div: divisor 1..99), circuit level
