@@ -1,0 +1,151 @@
+{
+ "meta": {
+  "git_commit": "426ff71d7729aa45eded07ba2b23e8a6462a170c",
+  "git_dirty": true,
+  "timestamp": "2026-11-07T20:39:56",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 15941.38
+ },
+ "data": {
+  "suites": [
+   {
+    "circuit": "add",
+    "suite": "exhaustive, operands < 10^2",
+    "cases": 10000,
+    "errors": 0,
+    "seconds": 3.6
+   },
+   {
+    "circuit": "sub",
+    "suite": "exhaustive, operands < 10^2",
+    "cases": 10000,
+    "errors": 0,
+    "seconds": 4.1
+   },
+   {
+    "circuit": "mul",
+    "suite": "exhaustive, operands < 10^2",
+    "cases": 10000,
+    "errors": 0,
+    "seconds": 22.6
+   },
+   {
+    "circuit": "div",
+    "suite": "exhaustive, operands < 10^2",
+    "cases": 9900,
+    "errors": 0,
+    "seconds": 37.7
+   },
+   {
+    "circuit": "add",
+    "suite": "signed decimals (arith)",
+    "cases": 1000,
+    "errors": 0,
+    "seconds": 1.7
+   },
+   {
+    "circuit": "sub",
+    "suite": "signed decimals (arith)",
+    "cases": 1000,
+    "errors": 0,
+    "seconds": 1.6
+   },
+   {
+    "circuit": "mul",
+    "suite": "signed decimals (arith)",
+    "cases": 1000,
+    "errors": 0,
+    "seconds": 26.5
+   },
+   {
+    "circuit": "div",
+    "suite": "signed decimals (arith)",
+    "cases": 1000,
+    "errors": 0,
+    "seconds": 299.7
+   },
+   {
+    "circuit": "add",
+    "suite": "random, up to 200 digits",
+    "cases": 200,
+    "errors": 0,
+    "seconds": 2.2
+   },
+   {
+    "circuit": "sub",
+    "suite": "random, up to 200 digits",
+    "cases": 200,
+    "errors": 0,
+    "seconds": 2.4
+   },
+   {
+    "circuit": "mul",
+    "suite": "random, up to 32 digits",
+    "cases": 60,
+    "errors": 0,
+    "seconds": 6.6
+   },
+   {
+    "circuit": "div",
+    "suite": "random, up to 32 digits",
+    "cases": 60,
+    "errors": 0,
+    "seconds": 98.4
+   },
+   {
+    "circuit": "parser",
+    "suite": "random expressions",
+    "cases": 1000,
+    "errors": 0,
+    "seconds": 78.9
+   },
+   {
+    "circuit": "parser",
+    "suite": "balanced trees, depth 1-4",
+    "cases": 40,
+    "errors": 0,
+    "seconds": 25.0
+   },
+   {
+    "circuit": "add",
+    "suite": "exhaustive, operands < 10^3",
+    "cases": 1000000,
+    "errors": 0,
+    "seconds": 750.1
+   },
+   {
+    "circuit": "sub",
+    "suite": "exhaustive, operands < 10^3",
+    "cases": 1000000,
+    "errors": 0,
+    "seconds": 429.3
+   },
+   {
+    "circuit": "mul",
+    "suite": "exhaustive, operands < 10^3",
+    "cases": 1000000,
+    "errors": 0,
+    "seconds": 2867.7
+   },
+   {
+    "circuit": "div",
+    "suite": "exhaustive, operands < 10^3",
+    "cases": 999000,
+    "errors": 0,
+    "seconds": 11892.4
+   }
+  ]
+ },
+ "macros": {
+  "CorrectnessCases": "4,044,460",
+  "CorrectnessErrors": "0"
+ }
+}

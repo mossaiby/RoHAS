@@ -1,0 +1,227 @@
+{
+ "meta": {
+  "git_commit": "426ff71d7729aa45eded07ba2b23e8a6462a170c",
+  "git_dirty": true,
+  "timestamp": "2026-11-07T20:41:58",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 81.58
+ },
+ "data": {
+  "circuits": [
+   {
+    "name": "add",
+    "params": 11112,
+    "nonzero": 482,
+    "layers": 9,
+    "heads": 7,
+    "mlp_units": 72,
+    "d_model": 48,
+    "vocab": 16
+   },
+   {
+    "name": "sub",
+    "params": 17870,
+    "nonzero": 983,
+    "layers": 9,
+    "heads": 8,
+    "mlp_units": 132,
+    "d_model": 49,
+    "vocab": 17
+   },
+   {
+    "name": "mul",
+    "params": 310251,
+    "nonzero": 7349,
+    "layers": 6,
+    "heads": 12,
+    "mlp_units": 809,
+    "d_model": 161,
+    "vocab": 117
+   },
+   {
+    "name": "div",
+    "params": 99607,
+    "nonzero": 4206,
+    "layers": 5,
+    "heads": 15,
+    "mlp_units": 427,
+    "d_model": 95,
+    "vocab": 48
+   },
+   {
+    "name": "parser",
+    "params": 193609,
+    "nonzero": 1500,
+    "layers": 17,
+    "heads": 28,
+    "mlp_units": 181,
+    "d_model": 243,
+    "vocab": 26
+   }
+  ],
+  "scaling": [
+   {
+    "op": "add",
+    "digits": 4,
+    "tokens": 20.0,
+    "seconds": 0.002624225616455078
+   },
+   {
+    "op": "add",
+    "digits": 16,
+    "tokens": 56.0,
+    "seconds": 0.007249689102172852
+   },
+   {
+    "op": "add",
+    "digits": 64,
+    "tokens": 200.0,
+    "seconds": 0.028625965118408203
+   },
+   {
+    "op": "add",
+    "digits": 256,
+    "tokens": 776.0,
+    "seconds": 0.13723433017730713
+   },
+   {
+    "op": "sub",
+    "digits": 4,
+    "tokens": 20.0,
+    "seconds": 0.0029045581817626954
+   },
+   {
+    "op": "sub",
+    "digits": 16,
+    "tokens": 56.0,
+    "seconds": 0.008321332931518554
+   },
+   {
+    "op": "sub",
+    "digits": 64,
+    "tokens": 200.0,
+    "seconds": 0.03108048439025879
+   },
+   {
+    "op": "sub",
+    "digits": 256,
+    "tokens": 776.0,
+    "seconds": 0.15493500232696533
+   },
+   {
+    "op": "mul",
+    "digits": 2,
+    "tokens": 34.0,
+    "seconds": 0.00832991600036621
+   },
+   {
+    "op": "mul",
+    "digits": 4,
+    "tokens": 104.0,
+    "seconds": 0.025573873519897462
+   },
+   {
+    "op": "mul",
+    "digits": 8,
+    "tokens": 364.0,
+    "seconds": 0.09971318244934083
+   },
+   {
+    "op": "mul",
+    "digits": 16,
+    "tokens": 1364.0,
+    "seconds": 0.5219950675964355
+   },
+   {
+    "op": "mul",
+    "digits": 32,
+    "tokens": 5284.0,
+    "seconds": 4.15069842338562
+   },
+   {
+    "op": "div",
+    "digits": 4,
+    "tokens": 272.6,
+    "seconds": 0.07922897338867188
+   },
+   {
+    "op": "div",
+    "digits": 8,
+    "tokens": 831.4,
+    "seconds": 0.3576334476470947
+   },
+   {
+    "op": "div",
+    "digits": 16,
+    "tokens": 2966.6,
+    "seconds": 1.9474210262298584
+   },
+   {
+    "op": "div",
+    "digits": 32,
+    "tokens": 11635.0,
+    "seconds": 21.149208664894104
+   },
+   {
+    "op": "parser",
+    "depth": 1,
+    "operators": 1,
+    "calls": 1,
+    "tokens": 38,
+    "seconds": 0.02674555778503418
+   },
+   {
+    "op": "parser",
+    "depth": 2,
+    "operators": 3,
+    "calls": 3,
+    "tokens": 117,
+    "seconds": 0.06882977485656738
+   },
+   {
+    "op": "parser",
+    "depth": 3,
+    "operators": 7,
+    "calls": 7,
+    "tokens": 485,
+    "seconds": 0.36968016624450684
+   },
+   {
+    "op": "parser",
+    "depth": 4,
+    "operators": 15,
+    "calls": 15,
+    "tokens": 1578,
+    "seconds": 1.5984580516815186
+   },
+   {
+    "op": "parser",
+    "depth": 5,
+    "operators": 31,
+    "calls": 31,
+    "tokens": 5803,
+    "seconds": 12.899705410003662
+   }
+  ]
+ },
+ "macros": {
+  "addParams": "11,112",
+  "subParams": "17,870",
+  "mulParams": "310,251",
+  "divParams": "99,607",
+  "parserParams": "193,609",
+  "addNonzero": "482",
+  "subNonzero": "983",
+  "mulNonzero": "7,349",
+  "divNonzero": "4,206",
+  "parserNonzero": "1,500"
+ }
+}
