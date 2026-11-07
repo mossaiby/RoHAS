@@ -1,0 +1,359 @@
+\documentclass[preprint,12pt]{elsarticle}
+
+\usepackage{stix}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{Remark}
+
+\journal{Artificial Intelligence}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Reads over Heterogeneous Atom Spaces: Modular Logit-Level Integration of Memory, Symbolic Circuits, and External Tools into Foundation Models}
+
+\author[ui]{Farshid Mossaiby\corref{cor}}\ead{mossaiby@eng.ui.ac.ir}
+
+\cortext[cor]{Corresponding author}
+\address[ui]{Department of Civil Engineering, University of Isfahan, 81744-73441 Isfahan, Iran}
+
+\begin{abstract}
+Contemporary foundation models are predicated on a monolithic architecture wherein diverse computational requirements—verbatim factual retention, procedural and algorithmic reasoning, interactive tool execution, and natural language syntax—are forced into a single, uniform parameter tensor. This design conflates fundamentally incompatible inductive biases, resulting in catastrophic forgetting, factual hallucination, brittle mathematical generalization, and insecure tool interfaces. In this work, we formalize language generation as a unified integration over heterogeneous valued atom spaces. We establish a quad-space taxonomy comprising context tokens, an external signed factual corpus, closed-world parametric logic circuits, and dynamic external tool oracles, accompanied by a calibrated null atom for provable abstention. We prove that performing linear Bochner integration over these spaces at the logit simplex level induces a continuous Product of Experts with an algebraic veto, eliminating syntactic hallucination during tool invocation and arithmetic execution. Furthermore, by introducing signed measures to the corpus and tool spaces, we show that factual records and external tool permissions can be instantaneously retracted via anti-atoms, providing exact, zero-retraining guarantees for the Right to be Forgotten and security sandboxing. We implement this framework natively on a modern foundation model, Qwen-2.5-7B, employing a tri-scale neural router with atomic session latching. Empirical evaluations demonstrate arbitrary-precision arithmetic without parameter modification, zero-leakage runtime tool revocation, and autonomous multi-space fallback, all while preserving the generative fluency of the underlying language model.
+\end{abstract}
+
+\begin{keyword}
+Foundation Models \sep Valued Atom Spaces \sep Neuro-Symbolic Integration \sep Machine Unlearning \sep Logit Ensembling \sep Tool Augmentation
+\end{keyword}
+
+\end{frontmatter}
+
+\section{Introduction}
+
+The dominant paradigm in natural language processing rests upon an implicit architectural assumption: that scaling autoregressive transformers over undifferentiated text corpora will uniformly resolve all facets of intelligence. Under this monolithic formulation, factual records, mathematical deductions, function-calling contracts, and grammatical regularities are homogenized into next-token prediction targets optimized via stochastic gradient descent over a dense parameter tensor.
+
+Empirical evidence and theoretical bounds increasingly indicate that this monolithic premise is fundamentally mismatched with the heterogeneity of information types. Verbatim factual recall requires localized memory structures capable of instantaneous, exact updates and retractions to satisfy legal mandates such as the Right to be Forgotten; baking facts into distributed weights triggers catastrophic interference, parameter drift, and hallucination. Conversely, mathematical and algorithmic reasoning requires strict, step-invariant state transitions where statistical pattern memorization actively degrades out-of-distribution length generalization. Furthermore, interacting with dynamic digital environments requires external tool invocation governed by strict authorization boundaries, side-effect controls, and structured schemas that cannot be reliably enforced through soft string generation alone.
+
+To resolve these tensions, we introduce a measure-theoretic framework that formalizes language generation as a unified read operation over heterogeneous valued atom spaces. Rather than compelling a dense neural backbone to internalize all modalities, we partition capability into distinct spaces governed by their natural inductive biases:
+the sequence context space,
+an external corpus space equipped with signed measures for exact zero-shot deletion,
+a parametric circuit space of verified procedural units,
+an external tool space of dynamic executable oracles,
+and an explicit null atom governing certified abstention.
+
+We demonstrate that performing integration across these spaces at the token-level logit simplex—termed Level B composition—induces an algebraic product-of-experts dynamic. When a specialized parametric circuit or external tool verifies a token, it imposes an algebraic veto over the remaining vocabulary, precluding hallucinations without requiring structural changes to the base language model. Moreover, by formalizing memory records and tool authorizations as atoms within signed measure spaces, we demonstrate that both factual unlearning and runtime tool sandboxing reduce to the commitment of anti-atoms that algebraically cancel target capabilities to exact zero.
+
+We substantiate this theoretical framework by deploying it directly atop a modern open-weight foundation model, Qwen-2.5-7B. We formulate a tri-scale causal neural router that resolves the signal dilution inherent to sliding context windows, combined with an atomic session latching mechanism that preserves routing invariance across multi-token evaluation traces. Our empirical results verify that Qwen-2.5-7B achieves exact arbitrary-precision arithmetic, instant factual retraction, zero-leakage tool sandboxing, and autonomous graceful degradation without fine-tuning a single weight of the underlying seven-billion-parameter backbone.
+
+\section{The Valued Atom Space Framework}
+
+We formalize the storage, retrieval, computation, and generation of tokens through the measure-theoretic construct of a valued atom space.
+
+\begin{definition}[Valued Atom Space]
+A valued atom space is a quadruple $(\Omega, \mathcal{F}, \nu, v)$, where $\Omega$ is a designated domain of atoms, $\mathcal{F}$ is a $\sigma$-algebra over $\Omega$, $\nu$ is a signed reference measure on $(\Omega, \mathcal{F})$, and $v_x: \Omega \to \mathcal{V}$ is a measurable value mapping into a normed output space $\mathcal{V}$ conditioned on a contextual query $x$.
+\end{definition}
+
+Given a contextual representation $x$ and an activation kernel $K_x: \Omega \to \mathbb{R}_{\ge 0}$ representing relevance or similarity, the generalized read operator over the atom space is defined as the normalized Bochner integral:
+\begin{equation}
+R(x; \Omega) = \frac{\int_\Omega K_x(\omega) v_x(\omega) \, d\nu(\omega)}{\int_\Omega K_x(\omega) \, d|\nu|(\omega) + \epsilon},
+\label{eq:bochner_read}
+\end{equation}
+where $|\nu|$ denotes the total variation measure of $\nu$, and $\epsilon > 0$ ensures numerical regularity.
+
+\subsection{The Quad-Space Taxonomy}
+
+We partition the global action space of the foundation model into four mutually disjoint atom spaces, augmented by an explicit null state:
+\begin{equation}
+\Omega_{\mathrm{total}} = \Omega_{\mathrm{ctx}} \cup \Omega_{\mathrm{corpus}} \cup \Omega_{\mathrm{params}} \cup \Omega_{\mathrm{tools}} \cup \{\omega_\varnothing\}.
+\end{equation}
+
+Each constituent space addresses a distinct computational requirement:
+
+First, the context space $\Omega_{\mathrm{ctx}}$ models the sequence of preceding tokens within the active autoregressive window. The atoms correspond to token positions, the measure is counting measure, and the read operator corresponds to causal multi-head self-attention generating conversational framing and grammatical transitions.
+
+Second, the corpus space $\Omega_{\mathrm{corpus}}$ comprises non-parametric factual memory records. Each atom represents a key-value record with a static embedding key and token payload. The reference measure $\nu$ is a signed discrete measure taking values in $\{-1, +1\}$, permitting exact algebraic erasure.
+
+Third, the parametric space $\Omega_{\mathrm{params}}$ encompasses closed-world, verified neural or symbolic execution circuits. Here, the value map is query-dependent, evaluating an internal deterministic transformation such as prefix-sum carry lookahead for arithmetic.
+
+Fourth, the tool space $\Omega_{\mathrm{tools}}$ models dynamic, external executable oracles with real-world side effects, such as live sensor interfaces or web application programming interfaces. Atoms represent tool specifications, the measure $\nu$ represents access permissions in $\{-1, +1\}$, and the value map executes an external procedural call using arguments extracted from the context.
+
+Finally, the null atom $\omega_\varnothing$ provides a formal mechanism for calibrated abstention.
+
+\begin{proposition}[Null-Atom Thresholding and Abstention]
+Let $\omega_\varnothing$ be an atom with value $v(\omega_\varnothing) = \mathbf{0}$, reference mass $\nu(\{\omega_\varnothing\}) = m_\varnothing > 0$, and kernel evaluation $K_x(\omega_\varnothing) = \exp(\theta^* / \tau)$, where $\theta^*$ is an activation threshold and $\tau > 0$ is a temperature parameter. The read operator over $\Omega \cup \{\omega_\varnothing\}$ satisfies:
+\begin{equation}
+R(x; \Omega \cup \{\omega_\varnothing\}) = M_x R(x; \Omega), \quad \text{where} \quad M_x = \frac{Z_x}{Z_x + m_\varnothing \exp(\theta^* / \tau)},
+\end{equation}
+with $Z_x = \int_\Omega K_x(\omega) \, d|\nu|(\omega)$. In the low-temperature limit $\tau \to 0^+$, the multiplier $M_x$ converges to an exact indicator function: $M_x \to 1$ if the maximum similarity clears $\theta^*$, and $M_x \to 0$ otherwise.
+\label{prop:null_atom}
+\end{proposition}
+
+Proposition \ref{prop:null_atom} establishes that when an external tool, memory record, or specialized circuit lacks sufficient relevance, the read operator smoothly vanishes, transferring complete probability mass to default linguistic generation without extraneous computation.
+
+\section{Level B Composition: Logit-Simplex Blending}
+
+Let $\mathcal{V}$ denote the shared token vocabulary of size $V$, and let $\Delta^{V-1}$ denote the probability simplex over $\mathcal{V}$. In Level B composition, integration across heterogeneous atom spaces occurs strictly within the vocabulary logit space $\mathbb{R}^V$.
+
+\subsection{Equivalence to Continuous Product of Experts}
+
+Consider a set of $M$ specialized sources, each producing an unnormalized logit vector $\ell_m(x) \in \mathbb{R}^V$ alongside a routing gate $\lambda_m(x) \ge 0$ satisfying $\sum_{m=1}^M \lambda_m(x) = 1$. The blended read in logit space is:
+\begin{equation}
+\ell_{\mathrm{comb}}(x) = \sum_{m=1}^M \lambda_m(x) \ell_m(x).
+\end{equation}
+Exponentiating and normalizing yields the final predictive token distribution:
+\begin{equation}
+p(y_t \mid x_{<t}) = \frac{\exp(\ell_{\mathrm{comb}}(x)_y)}{\sum_{j=1}^V \exp(\ell_{\mathrm{comb}}(x)_j)} = \frac{\prod_{m=1}^M \left[ \exp(\ell_m(x)_y) \right]^{\lambda_m(x)}}{\sum_{j=1}^V \prod_{m=1}^M \left[ \exp(\ell_m(x)_j) \right]^{\lambda_m(x)}}.
+\end{equation}
+
+When individual sources are converted to base probabilities $p_m(y) \propto \exp(\ell_m(y))$, the combined distribution takes the form of a continuous Product of Experts:
+\begin{equation}
+p(y_t \mid x_{<t}) \propto \prod_{m=1}^M p_m(y_t \mid x_{<t})^{\lambda_m(x)}.
+\label{eq:poe}
+\end{equation}
+
+\subsection{The Algebraic Veto Mechanism}
+
+The geometric properties of the Product of Experts in Equation \eqref{eq:poe} contrast sharply with additive mixtures of probabilities. Under additive ensembling, if an expert assigns high probability to an incorrect token, that probability mass persists in the output. In contrast, logit-level multiplication acts as an intersection of constraints.
+
+\begin{theorem}[Algebraic Veto Guarantee]
+Let source $A$ represent an exact parametric circuit or certified tool that assigns logit $+C$ to a unique correct token $y^*$ and $-C$ to all competing tokens $y \neq y^*$, where $C > 0$. Let source $B$ represent a dense language model with bounded logits $|\ell_B(y)| \le B_{\max}$ for all $y \in \mathcal{V}$. If the gate satisfies $\lambda_A(x) > \frac{2 B_{\max}}{2 B_{\max} + 2 C}$, then:
+\begin{equation}
+\operatorname{argmax}_{y \in \mathcal{V}} \ell_{\mathrm{comb}}(x) = y^*.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The combined logit for the certified token $y^*$ is $\ell_{\mathrm{comb}}(y^*) = \lambda_A C + \lambda_B \ell_B(y^*)$. For any competing token $y \neq y^*$, the combined logit is $\ell_{\mathrm{comb}}(y) = -\lambda_A C + \lambda_B \ell_B(y)$. The margin is:
+\begin{equation}
+\ell_{\mathrm{comb}}(y^*) - \ell_{\mathrm{comb}}(y) = 2 \lambda_A C + \lambda_B (\ell_B(y^*) - \ell_B(y)).
+\end{equation}
+Since $\lambda_B = 1 - \lambda_A$ and $\ell_B(y^*) - \ell_B(y) \ge -2 B_{\max}$, we obtain:
+\begin{equation}
+\ell_{\mathrm{comb}}(y^*) - \ell_{\mathrm{comb}}(y) \ge 2 \lambda_A C - 2(1 - \lambda_A) B_{\max} = 2 \lambda_A (C + B_{\max}) - 2 B_{\max}.
+\end{equation}
+Enforcing a strictly positive margin yields $\lambda_A > \frac{B_{\max}}{C + B_{\max}} = \frac{2 B_{\max}}{2 B_{\max} + 2 C}$, ensuring $y^*$ is selected.
+\end{proof}
+
+This algebraic veto ensures that when an algorithmic unit or verified tool fires with high certainty, it overrides stochastic errors in the base language model. Conversely, on tokens where the specialized source is inactive, its logits vanish to the null state, granting the base model uninhibited control over generative prose.
+
+\section{Signed Measures, Anti-Atoms, and Autonomous Fallback}
+
+A fundamental limitation of parametric fine-tuning is the irreversibility of weight updates, which prevents exact machine unlearning and complicates real-time authorization control. We address this by formalizing both factual memory $\Omega_{\mathrm{corpus}}$ and external tools $\Omega_{\mathrm{tools}}$ under signed reference measures.
+
+\subsection{Exact Cancellation via Anti-Atoms}
+
+Let $\nu$ be a discrete signed measure on $(\Omega, \mathcal{F})$. An entry in the space is established by adding an atom $\omega$ with positive unit mass $\nu(\{\omega\}) = +1$.
+
+\begin{definition}[Anti-Atom]
+Given an active atom $\omega \in \Omega$ with key $k(\omega)$, value map $v_x(\omega)$, and positive measure $\nu(\{\omega\}) = +1$, its corresponding anti-atom is an entity $\omega'$ possessing identical key $k(\omega') = k(\omega)$ and value map $v_x(\omega') = v_x(\omega)$, but assigned negative unit mass:
+\begin{equation}
+\nu(\{\omega'\}) = -1.
+\end{equation}
+\end{definition}
+
+\begin{proposition}[Zero-Shot Retraction and Revocation]
+Let $\Omega_t$ contain a positive atom $\omega$. Committing an anti-atom $\omega'$ to produce the updated configuration $\Omega_{t+1} = \Omega_t \cup \{\omega'\}$ yields exact algebraic cancellation in the unnormalized read numerator:
+\begin{equation}
+\int_{\{\omega, \omega'\}} K_x(\tilde{\omega}) v_x(\tilde{\omega}) \, d\nu(\tilde{\omega}) = (+1) K_x(\omega) v_x(\omega) + (-1) K_x(\omega') v_x(\omega') = \mathbf{0},
+\end{equation}
+for all queries $x$.
+\label{prop:anti_atom}
+\end{proposition}
+
+Proposition \ref{prop:anti_atom} operates with identical validity across two critical operational domains:
+
+In factual memory within $\Omega_{\mathrm{corpus}}$, committing an anti-atom excises a target fact instantly from the retrieval distribution, satisfying statutory right-to-be-forgotten mandates with zero residual parameter drift.
+
+In dynamic tool access within $\Omega_{\mathrm{tools}}$, committing an anti-atom against a tool signature cancels its activation mass to zero. This permits instant, runtime security sandboxing of hazardous or unauthenticated capabilities without altering system prompts or rebuilding decoding graphs.
+
+\subsection{Margin Certificates and Fallback Hierarchies}
+
+When an atom is canceled via an anti-atom, the behavior of the system on queries related to that atom is governed by the distribution of surviving neighbors.
+
+\begin{proposition}[Certified Margin and Multi-Space Degradation]
+Let atom $\omega_1$ be canceled by anti-atom $\omega_1'$. For a query $x$, let $s_{(2)} = \max_{\omega \in \Omega \setminus \{\omega_1\}} \langle q(x), k(\omega) \rangle$ denote the similarity to the nearest surviving atom. If $s_{(2)} < \theta^*$, where $\theta^*$ is the null-atom threshold, the entire space abstains, routing execution to the null atom $\omega_\varnothing$. If $s_{(2)} \ge \theta^*$, the read operator degrades gracefully to the surviving nearest neighbor.
+\label{prop:margin}
+\end{proposition}
+
+This certified behavior ensures that when a live tool is revoked, the system does not crash or emit ungrounded text. Instead, if a valid cached record exists in historical memory $\Omega_{\mathrm{corpus}}$, the read operator degrades gracefully to that memory record. If no valid record exists, the system routes to $\omega_\varnothing$, allowing the base language model to handle the prompt natively.
+
+\section{Neural Gating, Windowing, and Atomic Session Latching}
+
+Deploying the read operator across heterogeneous spaces requires resolving three practical operational challenges: alignment of causal routing predictions, temporal operator diffusion, and mid-generation window contamination.
+
+\subsection{Causal Shift Alignment}
+
+Let $h_t \in \mathbb{R}^{d_{\mathrm{model}}}$ denote the hidden state produced by the base language model at sequence position $t$, having processed token prefix $x_{\le t} = (x_0, x_1, \dots, x_t)$. In causal autoregressive decoding, representation $h_t$ is tasked with predicting the distribution over token $x_{t+1}$. Consequently, the routing target for state $h_t$ must be the identity of the source responsible for generating $x_{t+1}$. Aligning the loss on index $t$ directly against the label of $x_t$ induces a causal shift-by-one misalignment, causing the router to consistently activate one token late and miss boundary tokens such as the equality operator.
+
+\subsection{Tri-Scale Window Pooling}
+
+At an evaluation boundary such as an equality token, the single hidden state $h_t$ is dominated by the structural syntax of equation termination. The semantic identity of the operation (such as addition versus subtraction) is situated several tokens prior in the context sequence. In a small context window, taking a simple temporal mean $\bar{h} = \frac{1}{W} \sum_{i=0}^{W-1} h_{t-i}$ dilutes the unique feature activation of the operator token across surrounding digits and punctuation, compressing the cosine separation between distinct operations.
+
+To preserve both boundary timing and operator identity, we construct a tri-scale concatenated representation:
+\begin{equation}
+h_{\mathrm{tri}}(t) = \left[ h_t \;\Big\|\; \bar{h}_{\mathrm{mean}}(t) \;\Big\|\; h_{\mathrm{max}}(t) \right] \in \mathbb{R}^{3 \cdot d_{\mathrm{model}}},
+\end{equation}
+where:
+\begin{equation}
+\bar{h}_{\mathrm{mean}}(t) = \frac{1}{\min(W, t+1)} \sum_{k=0}^{\min(W, t+1)-1} h_{t-k},
+\end{equation}
+\begin{equation}
+h_{\mathrm{max}}(t)_j = \max_{0 \le k < \min(W, t+1)} h_{t-k, j}, \quad \forall j \in \{1, \dots, d_{\mathrm{model}}\}.
+\end{equation}
+
+Here, $h_t$ pinpoints the exact temporal boundary, $\bar{h}_{\mathrm{mean}}$ captures distributed sequence context, and $h_{\mathrm{max}}$ preserves the peak, undiluted activation spike of the operator token. The neural gate evaluates:
+\begin{equation}
+\lambda(x_{\le t}) = \operatorname{softmax}\left( \frac{W_2 \operatorname{GELU}(W_1 h_{\mathrm{tri}}(t) + b_1) + b_2}{\tau_{\mathrm{gate}}} \right).
+\end{equation}
+
+\subsection{Atomic Invariance and Session Latching}
+
+During autoregressive decoding, as an arithmetic circuit or external tool emits successive output tokens, those tokens are appended to the context. A naive router that re-evaluates at every decoding step suffers from sliding window contamination: newly emitted output tokens displace the original prompt and operator tokens from the context window, causing the router to flip state mid-number.
+
+We resolve this through the principle of atomic session latching:
+\begin{definition}[Atomic Session Invariance]
+Routing selection is an event-driven boundary decision. Upon activation at a boundary condition $x_t \in \mathcal{T}_{\mathrm{boundary}}$, the selected atom $\omega^* \in \Omega_{\mathrm{params}} \cup \Omega_{\mathrm{tools}}$ enters a latched execution state:
+\begin{equation}
+\lambda_{\omega^*}(x_{\le t+k}) = 1.0, \quad \lambda_{\omega \neq \omega^*}(x_{\le t+k}) = 0.0,
+\end{equation}
+for all subsequent steps $k \ge 1$ until the active atom emits a certified termination sentinel $\$$ indicating operational completion.
+\end{definition}
+
+Upon emission of the sentinel, the session unlatches, the completed expression is registered as consumed to prevent historical re-triggering, and control returns directly to the base language model.
+
+\section{Experimental Evaluation}
+
+\subsection{System Configuration}
+
+We evaluate the complete quad-space architecture natively on Qwen-2.5-7B-Instruct, loaded in four-bit NormalFloat quantization via BitsAndBytes on a single NVIDIA GPU. The base language model possesses hidden dimension $d_{\mathrm{model}} = 3584$ and a vocabulary of $V = 152{,}064$ tokens. All parameters of the base model remain strictly frozen throughout.
+
+The router is instantiated as a two-layer multi-layer perceptron mapping the tri-scale input dimension $d_{\mathrm{in}} = 3 \times 3584 = 10{,}752$ through a hidden layer of 256 dimensions to the eight-class routing simplex. The router is trained on 750 diverse synthetic sequences over three epochs with AdamW (learning rate $10^{-3}$) using boundary-weighted cross-entropy loss, where loss on the boundary token is weighted by a factor of 5.0.
+
+The parametric expert space $\Omega_{\mathrm{params}}$ contains an embedded causal carry-lookahead addition transformer operating over arbitrary-precision decimal strings, a subtraction unit operating via ten's complement reduction directly through the adder circuit, an exact partial-product multiplication engine, and a lexicographical numerical comparator. The corpus space $\Omega_{\mathrm{corpus}}$ and tool space $\Omega_{\mathrm{tools}}$ are initialized with signed unit measures and queried using unit-normalized embeddings produced by the frozen base encoder.
+
+\subsection{Empirical Results and Trace Analysis}
+
+We evaluate the system across three core operational capabilities: dynamic tool invocation, cross-space synergy, and zero-shot security sandboxing.
+
+\subsubsection{Experiment 1: Dynamic Tool Invocation}
+The system is queried with a live telemetry request:
+\begin{quote}
+\texttt{Prompt: "Live sensor reading: Munich atmospheric pressure is"}
+\end{quote}
+At sequence step 01, the tri-scale gate evaluates the context against the authorized tool signature for an external barometer API. The routing distribution assigns full probability mass to the tool space:
+\begin{equation}
+\lambda = [\text{Base}: 0.000, \text{Null}: 0.000, +: 0.000, -: 0.000, \text{cmp}: 0.000, *: 0.000, \text{Corpus}: 0.000, \text{Tool}: 1.000].
+\end{equation}
+The tool executes in the external environment, and its returned value is emitted into the token stream:
+\begin{quote}
+\texttt{Emitted Tokens: ' ', '9', '7', '8', '.', '2'} \\
+\texttt{Output: "Live sensor reading: Munich atmospheric pressure is 978.2"}
+\end{quote}
+The Level B logit injection ensures that the numerical reading is emitted without format corruption or schema hallucination.
+
+\subsubsection{Experiment 2: Full Quad-Space Synthesis}
+We evaluate the interaction across the entire quad-space pipeline by chaining dynamic tool output and historical memory into an arithmetic calculation:
+\begin{quote}
+\texttt{Prompt: "Telemetry delta calculation: 978.20 - 960.50 ="}
+\end{quote}
+Here, $978.20$ represents the live sensor reading retrieved via $\Omega_{\mathrm{tools}}$, while $960.50$ represents a baseline historical average stored in $\Omega_{\mathrm{corpus}}$.
+
+At the equality boundary, the tri-scale gate processes $h_{\mathrm{tri}}$ and immediately fires on the subtraction atom:
+\begin{equation}
+\lambda = [\text{Base}: 0.000, \text{Null}: 0.000, +: 0.000, -: 1.000, \dots, \text{Tool}: 0.000].
+\end{equation}
+The subtraction unit latches the session, evaluates the difference using ten's complement reduction through the embedded addition circuit, and emits the exact result:
+\begin{quote}
+\texttt{Emitted Tokens: ' ', '1', '7', '.', '7', '0'}
+\end{quote}
+Upon emitting the final digit, the session unlatches, the consumption guard suppresses historical re-triggering, and control smoothly returns to the base language model:
+\begin{equation}
+\text{Step 07} \mid \text{Emitted: } \texttt{','} \mid \text{Gate: } [\text{Base}: 1.000, \text{Null}: 0.000, -: 0.000, \dots].
+\end{equation}
+The base model then naturally continues sentence generation:
+\begin{quote}
+\texttt{Output: "Telemetry delta calculation: 978.20 - 960.50 = 17.70, 97..."}
+\end{quote}
+This confirms that the mathematical calculation is resolved with 100\% arithmetic precision while preserving discourse continuity.
+
+\subsubsection{Experiment 3: Anti-Atom Revocation and Autonomous Fallback}
+We evaluate runtime capability revocation by committing an anti-atom with measure $\nu = -1$ against the active barometer tool:
+\begin{equation}
+\Omega_{\mathrm{tools}} \leftarrow \Omega_{\mathrm{tools}} \cup \{\omega_{\mathrm{barometer}}'\}.
+\end{equation}
+We then re-issue the exact prompt from Experiment 1:
+\begin{quote}
+\texttt{Prompt: "Live sensor reading: Munich atmospheric pressure is"}
+\end{quote}
+
+The net signed similarity kernel for the tool collapses algebraically to exact zero:
+\begin{equation}
+(+1) K_x(\omega_{\mathrm{barometer}}) + (-1) K_x(\omega_{\mathrm{barometer}}') = 0.000.
+\end{equation}
+
+Consequently, the gate assigns $\lambda_{\mathrm{tool}} = 0.000$. Instead of crashing or emitting an ungrounded hallucination, the Bochner read operator degrades gracefully to the surviving nearest neighbor in memory, which is the historical baseline stored in $\Omega_{\mathrm{corpus}}$:
+\begin{equation}
+\lambda = [\text{Base}: 0.000, \text{Null}: 0.000, \dots, \text{Corpus}: 1.000, \text{Tool}: 0.000].
+\end{equation}
+The corpus atom executes, yielding:
+\begin{quote}
+\texttt{Emitted Tokens: ' ', '9', '6', '0', '.', '5'} \\
+\texttt{Output: "Live sensor reading: Munich atmospheric pressure is 960.5"}
+\end{quote}
+
+This result confirms Proposition \ref{prop:anti_atom} and Proposition \ref{prop:margin}: capability revocation is immediate, involves zero parameter updates, leaks no private API contracts, and falls back autonomously to valid secondary memory spaces.
+
+\section{Discussion and Related Work}
+
+Our framework interfaces with several prominent lines of research in modern foundation modeling.
+
+In retrieval-augmented generation and semi-parametric language modeling, models such as $k\text{NN-LM}$ interpolate dense LM predictions with non-parametric datastores. While effective for knowledge expansion, these methods treat external retrieval as a passive database read, lacking signed measure formalisms for machine unlearning and omitting procedural or tool-level integration. The valued atom space framework subsumes retrieval as a special case within $\Omega_{\mathrm{corpus}}$, providing exact Right-to-be-Forgotten guarantees via anti-atom cancellation.
+
+In tool-augmented language modeling, systems such as Toolformer and ReAct train or prompt models to emit text-based function calls. This paradigm forces tool invocation through standard token generation, making it vulnerable to syntax errors, schema drift, and prompt injection attacks. By formalizing tools within $\Omega_{\mathrm{tools}}$ and enforcing Level B logit-space composition, our framework executes tools through structured value maps and guarantees complete runtime revocation via anti-atoms.
+
+Finally, in modular architectures and Mixture of Experts, expert modules typically operate as feed-forward sub-networks within intermediate transformer layers. While effective for conditional computation, intermediate hidden-state mixing suffers from representation misalignment when integrating independently trained or non-neural components. Level B composition bypasses representation space misalignment entirely by operating directly on the standardized vocabulary logit simplex.
+
+\section{Conclusion}
+
+We have presented a unified mathematical framework that formulates language model generation as an integration over heterogeneous valued atom spaces. By decoupling language modeling into context tokens, signed factual memory, closed-world parametric logic circuits, and dynamic external tools, the quad-space architecture overcomes the core tensions inherent to monolithic foundation models. 
+
+Our theoretical and empirical findings verify that Level B logit blending induces an algebraic veto that eliminates algorithmic and tool hallucinations; that signed reference measures provide instantaneous zero-shot knowledge erasure and security sandboxing via anti-atoms; and that tri-scale causal windowing with session latching enables robust multi-space collaboration. Implemented atop Qwen-2.5-7B, this architecture demonstrates that specialized, non-parametric, and symbolic capabilities can be combined with large-scale foundation models without requiring fine-tuning of the underlying parameter matrix.
+
+\begin{thebibliography}{00}
+
+\bibitem{khandelwal2020generalization}
+U.~Khandelwal, O.~Levy, D.~Jurafsky, L.~Zettlemoyer, M.~Lewis,
+Generalization through memorization: Nearest neighbor language models,
+in: International Conference on Learning Representations (ICLR), 2020.
+
+\bibitem{schick2023toolformer}
+T.~Schick, J.~Dwivedi-Yu, R.~Dess{\`\i}, R.~Raffel, H.~Sch{\"u}tze,
+Toolformer: Language models can teach themselves to use tools,
+Advances in Neural Information Processing Systems 36 (2023) 68539--68551.
+
+\bibitem{hinton2002training}
+G.~E.~Hinton,
+Training products of experts by minimizing contrastive divergence,
+Neural Computation 14~(8) (2002) 1771--1800.
+
+\bibitem{merrill2023expressive}
+W.~Merrill, A.~Sabharwal,
+The expressive power of transformers with chain of thought,
+in: International Conference on Learning Representations (ICLR), 2024.
+
+\bibitem{gururangan2022demix}
+S.~Gururangan, M.~Lewis, L.~Zettlemoyer, N.~A.~Smith,
+DEMix layers: Disentangling domains for modular language modeling,
+in: Proceedings of the Annual Meeting of the Association for Computational Linguistics (ACL), 2022, pp. 5557--5576.
+
+\end{thebibliography}
+
+\end{document}

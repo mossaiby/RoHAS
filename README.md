@@ -104,9 +104,15 @@ where $h_t$ provides the boundary trigger and $\bar{h}_{\mathrm{win}}$ preserves
 
 ### Setup
 ```bash
-pip install torch transformers numpy
-python atom_space_engine.py
+python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+pip install -r requirements.txt
+python qwen25_quad_space_engine.py            # Qwen-2.5-7B-Instruct (4-bit); falls back to 3B if VRAM is short
+python qwen25_quad_space_engine.py --model <hf-model-id>
 ```
+
+The paper (`paper/main.tex`, `paper/main.pdf`) evaluates `qwen25_quad_space_engine.py`.
+Earlier development scripts (hand-weighted adder, GPT-2 single/tri/quad-space engines, gate-training iterations v1–v5) are archived in `misc/`.
+The traces below come from the earlier GPT-2 engine (`misc/atom_space_engine.py`).
 
 ### Empirical Trace Analysis
 
