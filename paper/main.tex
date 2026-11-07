@@ -2,7 +2,6 @@
 
 \usepackage{stix}
 \usepackage{amsmath}
-\usepackage{amssymb}
 \usepackage{amsthm}
 \usepackage{booktabs}
 \usepackage{hyperref}
@@ -40,7 +39,7 @@ Foundation Models \sep Valued Atom Spaces \sep Neuro-Symbolic Integration \sep M
 
 The dominant paradigm in natural language processing rests upon an implicit architectural assumption: that scaling autoregressive transformers over undifferentiated text corpora will uniformly resolve all facets of intelligence. Under this monolithic formulation, factual records, mathematical deductions, function-calling contracts, and grammatical regularities are homogenized into next-token prediction targets optimized via stochastic gradient descent over a dense parameter tensor.
 
-Empirical evidence and theoretical bounds increasingly indicate that this monolithic premise is fundamentally mismatched with the heterogeneity of information types. Verbatim factual recall requires localized memory structures capable of instantaneous, exact updates and retractions to satisfy legal mandates such as the Right to be Forgotten; baking facts into distributed weights triggers catastrophic interference, parameter drift, and hallucination. Conversely, mathematical and algorithmic reasoning requires strict, step-invariant state transitions where statistical pattern memorization actively degrades out-of-distribution length generalization. Furthermore, interacting with dynamic digital environments requires external tool invocation governed by strict authorization boundaries, side-effect controls, and structured schemas that cannot be reliably enforced through soft string generation alone.
+Empirical evidence and theoretical bounds increasingly indicate that this monolithic premise is fundamentally mismatched with the heterogeneity of information types. Verbatim factual recall requires localized memory structures capable of instantaneous, exact updates and retractions to satisfy legal mandates such as the Right to be Forgotten; baking facts into distributed weights triggers catastrophic interference, parameter drift, and hallucination. Conversely, mathematical and algorithmic reasoning requires strict, step-invariant state transitions where statistical pattern memorization actively degrades out-of-distribution length generalization~\cite{merrill2024expressive}. Furthermore, interacting with dynamic digital environments requires external tool invocation governed by strict authorization boundaries, side-effect controls, and structured schemas that cannot be reliably enforced through soft string generation alone.
 
 To resolve these tensions, we introduce a measure-theoretic framework that formalizes language generation as a unified read operation over heterogeneous valued atom spaces. Rather than compelling a dense neural backbone to internalize all modalities, we partition capability into distinct spaces governed by their natural inductive biases:
 the sequence context space,
@@ -113,7 +112,7 @@ Exponentiating and normalizing yields the final predictive token distribution:
 p(y_t \mid x_{<t}) = \frac{\exp(\ell_{\mathrm{comb}}(x)_y)}{\sum_{j=1}^V \exp(\ell_{\mathrm{comb}}(x)_j)} = \frac{\prod_{m=1}^M \left[ \exp(\ell_m(x)_y) \right]^{\lambda_m(x)}}{\sum_{j=1}^V \prod_{m=1}^M \left[ \exp(\ell_m(x)_j) \right]^{\lambda_m(x)}}.
 \end{equation}
 
-When individual sources are converted to base probabilities $p_m(y) \propto \exp(\ell_m(y))$, the combined distribution takes the form of a continuous Product of Experts:
+When individual sources are converted to base probabilities $p_m(y) \propto \exp(\ell_m(y))$, the combined distribution takes the form of a continuous Product of Experts~\cite{hinton2002training}:
 \begin{equation}
 p(y_t \mid x_{<t}) \propto \prod_{m=1}^M p_m(y_t \mid x_{<t})^{\lambda_m(x)}.
 \label{eq:poe}
@@ -124,7 +123,7 @@ p(y_t \mid x_{<t}) \propto \prod_{m=1}^M p_m(y_t \mid x_{<t})^{\lambda_m(x)}.
 The geometric properties of the Product of Experts in Equation \eqref{eq:poe} contrast sharply with additive mixtures of probabilities. Under additive ensembling, if an expert assigns high probability to an incorrect token, that probability mass persists in the output. In contrast, logit-level multiplication acts as an intersection of constraints.
 
 \begin{theorem}[Algebraic Veto Guarantee]
-Let source $A$ represent an exact parametric circuit or certified tool that assigns logit $+C$ to a unique correct token $y^*$ and $-C$ to all competing tokens $y \neq y^*$, where $C > 0$. Let source $B$ represent a dense language model with bounded logits $|\ell_B(y)| \le B_{\max}$ for all $y \in \mathcal{V}$. If the gate satisfies $\lambda_A(x) > \frac{2 B_{\max}}{2 B_{\max} + 2 C}$, then:
+Let source $A$ represent an exact parametric circuit or certified tool that assigns logit $+C$ to a unique correct token $y^*$ and $-C$ to all competing tokens $y \neq y^*$, where $C > 0$. Let source $B$ represent a dense language model with bounded logits $|\ell_B(y)| \le B_{\max}$ for all $y \in \mathcal{V}$. If the gate satisfies $\lambda_A(x) > \frac{B_{\max}}{B_{\max} + C}$, then:
 \begin{equation}
 \operatorname{argmax}_{y \in \mathcal{V}} \ell_{\mathrm{comb}}(x) = y^*.
 \end{equation}
@@ -139,7 +138,7 @@ Since $\lambda_B = 1 - \lambda_A$ and $\ell_B(y^*) - \ell_B(y) \ge -2 B_{\max}$,
 \begin{equation}
 \ell_{\mathrm{comb}}(y^*) - \ell_{\mathrm{comb}}(y) \ge 2 \lambda_A C - 2(1 - \lambda_A) B_{\max} = 2 \lambda_A (C + B_{\max}) - 2 B_{\max}.
 \end{equation}
-Enforcing a strictly positive margin yields $\lambda_A > \frac{B_{\max}}{C + B_{\max}} = \frac{2 B_{\max}}{2 B_{\max} + 2 C}$, ensuring $y^*$ is selected.
+Enforcing a strictly positive margin yields $\lambda_A > \frac{B_{\max}}{B_{\max} + C}$, ensuring $y^*$ is selected.
 \end{proof}
 
 This algebraic veto ensures that when an algorithmic unit or verified tool fires with high certainty, it overrides stochastic errors in the base language model. Conversely, on tokens where the specialized source is inactive, its logits vanish to the null state, granting the base model uninhibited control over generative prose.
@@ -235,7 +234,7 @@ Upon emission of the sentinel, the session unlatches, the completed expression i
 
 We evaluate the complete quad-space architecture natively on Qwen-2.5-7B-Instruct, loaded in four-bit NormalFloat quantization via BitsAndBytes on a single NVIDIA GPU. The base language model possesses hidden dimension $d_{\mathrm{model}} = 3584$ and a vocabulary of $V = 152{,}064$ tokens. All parameters of the base model remain strictly frozen throughout.
 
-The router is instantiated as a two-layer multi-layer perceptron mapping the tri-scale input dimension $d_{\mathrm{in}} = 3 \times 3584 = 10{,}752$ through a hidden layer of 256 dimensions to the eight-class routing simplex. The router is trained on 750 diverse synthetic sequences over three epochs with AdamW (learning rate $10^{-3}$) using boundary-weighted cross-entropy loss, where loss on the boundary token is weighted by a factor of 5.0.
+The router is instantiated as a two-layer multi-layer perceptron mapping the tri-scale input dimension $d_{\mathrm{in}} = 3 \times 3584 = 10{,}752$ through a hidden layer of 256 dimensions to the eight-class routing simplex. The router is trained on 600 diverse synthetic sequences over three epochs with AdamW (learning rate $10^{-3}$) using boundary-weighted cross-entropy loss, where loss on the boundary token is weighted by a factor of 5.0.
 
 The parametric expert space $\Omega_{\mathrm{params}}$ contains an embedded causal carry-lookahead addition transformer operating over arbitrary-precision decimal strings, a subtraction unit operating via ten's complement reduction directly through the adder circuit, an exact partial-product multiplication engine, and a lexicographical numerical comparator. The corpus space $\Omega_{\mathrm{corpus}}$ and tool space $\Omega_{\mathrm{tools}}$ are initialized with signed unit measures and queried using unit-normalized embeddings produced by the frozen base encoder.
 
@@ -278,10 +277,11 @@ Upon emitting the final digit, the session unlatches, the consumption guard supp
 \begin{equation}
 \text{Step 07} \mid \text{Emitted: } \texttt{','} \mid \text{Gate: } [\text{Base}: 1.000, \text{Null}: 0.000, -: 0.000, \dots].
 \end{equation}
-The base model then naturally continues sentence generation:
+The base model then resumes free-form generation after the certified result:
 \begin{quote}
-\texttt{Output: "Telemetry delta calculation: 978.20 - 960.50 = 17.70, 97..."}
+\texttt{Output: "Telemetry delta calculation: 978.20 - 960.50 = 17.70, \dots"}
 \end{quote}
+The continuation after the comma is produced entirely by the unconstrained base model and is not part of the certified arithmetic span.
 This confirms that the mathematical calculation is resolved with 100\% arithmetic precision while preserving discourse continuity.
 
 \subsubsection{Experiment 3: Anti-Atom Revocation and Autonomous Fallback}
@@ -315,11 +315,11 @@ This result confirms Proposition \ref{prop:anti_atom} and Proposition \ref{prop:
 
 Our framework interfaces with several prominent lines of research in modern foundation modeling.
 
-In retrieval-augmented generation and semi-parametric language modeling, models such as $k\text{NN-LM}$ interpolate dense LM predictions with non-parametric datastores. While effective for knowledge expansion, these methods treat external retrieval as a passive database read, lacking signed measure formalisms for machine unlearning and omitting procedural or tool-level integration. The valued atom space framework subsumes retrieval as a special case within $\Omega_{\mathrm{corpus}}$, providing exact Right-to-be-Forgotten guarantees via anti-atom cancellation.
+In retrieval-augmented generation and semi-parametric language modeling, models such as $k\text{NN-LM}$~\cite{khandelwal2020generalization} interpolate dense LM predictions with non-parametric datastores. While effective for knowledge expansion, these methods treat external retrieval as a passive database read, lacking signed measure formalisms for machine unlearning and omitting procedural or tool-level integration. The valued atom space framework subsumes retrieval as a special case within $\Omega_{\mathrm{corpus}}$, providing exact Right-to-be-Forgotten guarantees via anti-atom cancellation.
 
-In tool-augmented language modeling, systems such as Toolformer and ReAct train or prompt models to emit text-based function calls. This paradigm forces tool invocation through standard token generation, making it vulnerable to syntax errors, schema drift, and prompt injection attacks. By formalizing tools within $\Omega_{\mathrm{tools}}$ and enforcing Level B logit-space composition, our framework executes tools through structured value maps and guarantees complete runtime revocation via anti-atoms.
+In tool-augmented language modeling, systems such as Toolformer~\cite{schick2023toolformer} and ReAct~\cite{yao2023react} train or prompt models to emit text-based function calls. This paradigm forces tool invocation through standard token generation, making it vulnerable to syntax errors, schema drift, and prompt injection attacks. By formalizing tools within $\Omega_{\mathrm{tools}}$ and enforcing Level B logit-space composition, our framework executes tools through structured value maps and guarantees complete runtime revocation via anti-atoms.
 
-Finally, in modular architectures and Mixture of Experts, expert modules typically operate as feed-forward sub-networks within intermediate transformer layers. While effective for conditional computation, intermediate hidden-state mixing suffers from representation misalignment when integrating independently trained or non-neural components. Level B composition bypasses representation space misalignment entirely by operating directly on the standardized vocabulary logit simplex.
+Finally, in modular architectures and Mixture of Experts, expert modules~\cite{gururangan2022demix} typically operate as feed-forward sub-networks within intermediate transformer layers. While effective for conditional computation, intermediate hidden-state mixing suffers from representation misalignment when integrating independently trained or non-neural components. Level B composition bypasses representation space misalignment entirely by operating directly on the standardized vocabulary logit simplex.
 
 \section{Conclusion}
 
@@ -335,7 +335,7 @@ Generalization through memorization: Nearest neighbor language models,
 in: International Conference on Learning Representations (ICLR), 2020.
 
 \bibitem{schick2023toolformer}
-T.~Schick, J.~Dwivedi-Yu, R.~Dess{\`\i}, R.~Raffel, H.~Sch{\"u}tze,
+T.~Schick, J.~Dwivedi-Yu, R.~Dess{\`\i}, R.~Raileanu, M.~Lomeli, E.~Hambro, L.~Zettlemoyer, N.~Cancedda, T.~Scialom,
 Toolformer: Language models can teach themselves to use tools,
 Advances in Neural Information Processing Systems 36 (2023) 68539--68551.
 
@@ -344,10 +344,15 @@ G.~E.~Hinton,
 Training products of experts by minimizing contrastive divergence,
 Neural Computation 14~(8) (2002) 1771--1800.
 
-\bibitem{merrill2023expressive}
+\bibitem{merrill2024expressive}
 W.~Merrill, A.~Sabharwal,
 The expressive power of transformers with chain of thought,
 in: International Conference on Learning Representations (ICLR), 2024.
+
+\bibitem{yao2023react}
+S.~Yao, J.~Zhao, D.~Yu, N.~Du, I.~Shafran, K.~Narasimhan, Y.~Cao,
+ReAct: Synergizing reasoning and acting in language models,
+in: International Conference on Learning Representations (ICLR), 2023.
 
 \bibitem{gururangan2022demix}
 S.~Gururangan, M.~Lewis, L.~Zettlemoyer, N.~A.~Smith,
