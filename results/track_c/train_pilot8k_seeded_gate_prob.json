@@ -1,0 +1,113 @@
+{
+ "meta": {
+  "git_commit": "208a556ed57a8f0f4648ba0ea17d63ed681a374f",
+  "git_dirty": true,
+  "timestamp": "2026-11-08T02:16:33",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 295.15
+ },
+ "data": {
+  "name": "pilot8k_seeded_gate_prob",
+  "experts": [
+   "pilot8k_seeded_lang",
+   "pilot8k_seeded_facts",
+   "pilot8k_seeded_math",
+   "pilot8k_seeded_code"
+  ],
+  "mode": "prob",
+  "gate_params": 793860,
+  "tokens": 5996544,
+  "flops": 1009777472962560.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 3.4244723025448267
+   },
+   {
+    "step": 146,
+    "loss": 3.2466525951487037
+   },
+   {
+    "step": 219,
+    "loss": 3.1625145508506853
+   },
+   {
+    "step": 292,
+    "loss": 3.1477761561456816
+   },
+   {
+    "step": 365,
+    "loss": 3.145351711622084
+   },
+   {
+    "step": 438,
+    "loss": 3.1354550462854296
+   },
+   {
+    "step": 511,
+    "loss": 3.1443607099175375
+   },
+   {
+    "step": 584,
+    "loss": 3.1435188188902274
+   },
+   {
+    "step": 657,
+    "loss": 3.122397015688861
+   },
+   {
+    "step": 730,
+    "loss": 3.1504168036683806
+   },
+   {
+    "step": 803,
+    "loss": 3.146074782937484
+   },
+   {
+    "step": 876,
+    "loss": 3.1458658643953976
+   },
+   {
+    "step": 949,
+    "loss": 3.120965034985823
+   },
+   {
+    "step": 1022,
+    "loss": 3.14519012337471
+   },
+   {
+    "step": 1095,
+    "loss": 3.1306435326086373
+   },
+   {
+    "step": 1168,
+    "loss": 3.1084859088400036
+   },
+   {
+    "step": 1241,
+    "loss": 3.1263778311131625
+   },
+   {
+    "step": 1314,
+    "loss": 3.1141300412362227
+   },
+   {
+    "step": 1387,
+    "loss": 3.1392192933533525
+   },
+   {
+    "step": 1460,
+    "loss": 3.1371263391011754
+   }
+  ]
+ },
+ "macros": {}
+}
