@@ -273,13 +273,18 @@ def main():
     ap.add_argument("--systems", nargs="+", required=True)
     ap.add_argument("--skip", nargs="*", default=[])
     ap.add_argument("--people", default="old", choices=["old", "new"])
+    ap.add_argument("--eval-seed", type=int, default=0,
+                    help="seed of the arithmetic and word-problem items (0 = the items used during development)")
+    ap.add_argument("--per-cell", type=int, default=50, help="arithmetic items per (op, digits) cell")
     args = ap.parse_args()
     tok = Tokenizer.from_file(os.path.join(DATA, "tokenizer.json"))
     persons = json.load(open(os.path.join(DATA, "people.json")))
     path = os.path.join(os.path.dirname(DATA), "..", "results", "track_c", f"eval_{args.tag}.json")
-    results = {}
+    results, prior = {}, 0.0
     if os.path.exists(path):
-        results = json.load(open(path))["data"]["systems"]
+        old = json.load(open(path))
+        results = old["data"]["systems"]
+        prior = old["meta"].get("wall_time_s", 0.0)   # a resumed run adds to it; None (invalid) stays None
     t0 = time.time()
     for spec in args.systems:
         s = make_system(spec)
@@ -294,15 +299,18 @@ def main():
                 r["facts_new_heldout"] = fact_recall(s, tok, persons["new"], heldout=True)
                 r["facts_new_train_templates"] = fact_recall(s, tok, persons["new"], heldout=False)
         if "math" not in args.skip:
-            r["arith"], r["arith_number"] = arithmetic(s, tok)
-            r["word"] = word_problems(s, tok)
+            r["arith"], r["arith_number"] = arithmetic(s, tok, per_cell=args.per_cell, seed=args.eval_seed)
+            r["word"] = word_problems(s, tok, seed=1 + args.eval_seed)
+            r["eval_seed"], r["per_cell"] = args.eval_seed, args.per_cell
         if isinstance(s, Gated) and "routing" not in args.skip:
             r["routing"] = routing(s)
         results[s.name] = r
         print(s.name, f"({time.time() - t:.0f}s)", json.dumps(r), flush=True)
+        # saved after every system, so a crash or interruption loses at most one
+        save("track_c", f"eval_{args.tag}", {"systems": results}, wall_time=None if prior is None else prior + time.time() - t0,
+             extra_meta={"wall_time_s": None} if prior is None else None)
         del s
         torch.cuda.empty_cache()
-    save("track_c", f"eval_{args.tag}", {"systems": results}, wall_time=time.time() - t0)
 
 
 if __name__ == "__main__":

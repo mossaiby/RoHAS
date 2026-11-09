@@ -1,0 +1,122 @@
+{
+ "meta": {
+  "git_commit": "5367b9cf3be15d313be0f0b1831ad864cfac5fa7",
+  "git_dirty": true,
+  "timestamp": "2026-11-09T14:31:38",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 794.85
+ },
+ "data": {
+  "name": "main_gate_atom",
+  "experts": [
+   "main_lang",
+   "main_facts",
+   "main_math",
+   "main_code",
+   "circuit"
+  ],
+  "mode": "prob",
+  "conf": true,
+  "split": false,
+  "atom": true,
+  "veto": true,
+  "atom_head": "linear",
+  "atom_lr": 0.03,
+  "atom_units": "nats",
+  "circuit_calls": 29656,
+  "gate_params": 796423,
+  "tokens": 5996544,
+  "flops": 1009869687816192.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 2.7536314019397388
+   },
+   {
+    "step": 146,
+    "loss": 2.5319300283894646
+   },
+   {
+    "step": 219,
+    "loss": 2.4265621456754105
+   },
+   {
+    "step": 292,
+    "loss": 2.4087067030515983
+   },
+   {
+    "step": 365,
+    "loss": 2.4000252046504165
+   },
+   {
+    "step": 438,
+    "loss": 2.405579375794841
+   },
+   {
+    "step": 511,
+    "loss": 2.4177299337602376
+   },
+   {
+    "step": 584,
+    "loss": 2.4020660324286687
+   },
+   {
+    "step": 657,
+    "loss": 2.383924785225157
+   },
+   {
+    "step": 730,
+    "loss": 2.3903966328355786
+   },
+   {
+    "step": 803,
+    "loss": 2.399769620799983
+   },
+   {
+    "step": 876,
+    "loss": 2.3956154849752083
+   },
+   {
+    "step": 949,
+    "loss": 2.3797653918309605
+   },
+   {
+    "step": 1022,
+    "loss": 2.3856634991721237
+   },
+   {
+    "step": 1095,
+    "loss": 2.3991375967500694
+   },
+   {
+    "step": 1168,
+    "loss": 2.3638192917151195
+   },
+   {
+    "step": 1241,
+    "loss": 2.373421789133459
+   },
+   {
+    "step": 1314,
+    "loss": 2.375874398094873
+   },
+   {
+    "step": 1387,
+    "loss": 2.4050637874352843
+   },
+   {
+    "step": 1460,
+    "loss": 2.389861542306563
+   }
+  ]
+ },
+ "macros": {}
+}

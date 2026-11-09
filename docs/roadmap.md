@@ -202,3 +202,25 @@ and `arith_number` (the answer is exact and not followed by another digit).
   train json). Arithmetic in all tag files was re-scored with both metrics; original wall
   times are kept, the re-score time is `wall_time_rescore_arith_s`.
 
+### Track C circuit robustness (`run_robustness.py`)
+
+The final gate design was chosen on the development items (eval seed 0), so it is re-tested on
+fresh items (eval seed 1000, 100 per cell; `eval_main_heldout*.json`), with two more gate seeds
+and on the independent experts (`eval_main_circuit_seeds.json`). Experts are fixed across gate
+seeds, so the spread is gate variance only.
+
+- **Answer number exact in every held-out cell** (+ and − at 1-32 digits, * at 1-8) for all three
+  seeds of the seeded atom gate and for the atom gate on the independent experts. Without the
+  circuit the same experts reach 0 by 8 digits (+, −) and 3 digits (*); mono_s 0.01 at 6-digit +.
+- Circuit weight where active: 0.993, 0.785, 0.981 (seeds 0-2), 0.996 (independent); about 0 elsewhere.
+  Seed 1's lower weight still gives exact answers (prob mixing: weight > 0.5 decides the argmax).
+- Losses, seeded, control vs atom gate (3 seeds each): mixed 2.162/2.162/2.162 vs 2.140/2.141/2.141;
+  facts 0.882/0.895/0.892 vs 0.879/0.903/0.902; lang and code within 0.002. Independent experts:
+  mixed 2.504 vs 2.438, facts 0.957 vs 0.978 (a small facts cost to watch).
+- Word problems (held-out): 0.91 for the seeded control, 1.00 for every atom gate.
+- Vetoes off: + 0.29 at 12 digits, 0.02 at 32 (seeded); independent 0.26 at 8 digits.
+- Line match (answer then newline) from 16 digits is erratic across seeds (+ 0.18-0.46 at 16,
+  ≤ 0.08 at 24-32): the LM experts, not the circuit, end the line.
+- Eval wall times vary 4x between identical workloads in this run (other load on the machine);
+  gate training times are consistent (330 s control, 795 s atom gate).
+
