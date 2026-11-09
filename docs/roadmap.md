@@ -112,6 +112,7 @@ and the mock barometer experiment.
 | Track C pilot (T = 10M per expert) | done, see below; mono_s wins at this budget |
 | Track C main (T = 100M per expert) | done, see main notes: experts win on their own types and fact recall, gated system loses on mixed text |
 | Track C add-facts test | done for both variants, including the fair `replay_all` baseline for the monolithic models |
+| Track C + compiled circuit as a 5th expert | done (seeded experts), see circuit notes: exact answers at every length to 32 digits, other types unchanged |
 | Tracks B, D, D2, ablations | not started |
 | Draft | outline, abstract skeleton, Related Work and Section 4 written; Sections 5–9 are TODO skeletons |
 
@@ -164,3 +165,40 @@ Reproduce Track A: `python experiments/track_a/run_correctness.py` (plus `--suit
     on mixed text; the gated system loses nothing elsewhere, mono_s loses on every type.
 - Hibernation: timings of `train_main_seeded_lang.json` and
   `eval_main_seeded_add_facts.json` are marked invalid.
+
+### Track C circuit notes (compiled circuits as a fifth expert, seeded experts, 6M gate tokens)
+
+`run_circuit.py`; results in `eval_main_circuit.json` (ablations) and `eval_main_circuit_atom.json`
+(final). No routing labels; the circuit sees token ids only and abstains with the null atom
+elsewhere. Arithmetic is scored two ways: `arith` (the generated line is exactly "=" + answer)
+and `arith_number` (the answer is exact and not followed by another digit).
+
+- **Final system (`gate_atom`, prob):** answer number exact in every cell, + and − at 1-32
+  digits, * at 1-8 digits (50 items each); without the circuit, the same experts reach 0 by 8
+  digits (+) and 4 digits (*). Losses unchanged (lang 1.685, facts 0.879, math 0.713, code 1.994,
+  mixed 2.140 vs 2.162 for the confidence-only control), fact recall unchanged, word problems
+  0.995 vs 0.905. Circuit weight 0.993 where it is active, 0.000 elsewhere.
+- **Line match** fails from 16 digits (+ 0.12, 0.06, 0.00 at 16/24/32): the answer is right and
+  complete, then the LM experts write "=" instead of a newline on lines longer than any they saw.
+  The circuit leaves the next non-digit to the other experts by design.
+- **What each piece does** (ablations, all prob unless noted):
+  - joint gate on hidden states + confidence (`gate_circ`): trust in the circuit fades after
+    about 6 digits (+ 0.16 at 12).
+  - separate confidence head on all experts' confidence (`gate_split`): exact to 8 digits, fails
+    from 12 (the LM experts' confidence rises, wrongly, on long numbers).
+  - two-level gate, atom weighted by its own confidence (`gate_atom_mlp`, `gate_atom_lin`): with
+    the confidence divided by log V, the active and abstaining states differ by about 1 per
+    feature, and the head settles at weight 0.40 where the circuit is active, although the data
+    optimum is near 1 (checked: the circuit is right at all 6,940 active positions sampled).
+    In nats the weight is 0.993.
+  - vetoes off (`gate_atom:prob_noveto`): + 0.20 at 12 digits, 0.04 at 32; the LMs append digits
+    to a complete answer, and pick the wrong sign token for subtraction.
+  - hard routing (`gate_atom:hard`) is also exact on the number, but costs 0.13 nats on mixed
+    text and 0.8 on facts.
+- The circuit expert was checked on 2M tokens each of mixed, math, code and story text: no wrong
+  active predictions and no vetoed true token (after the window-start fix: an equation whose
+  first operand starts at the first position of the window is ignored).
+- Not counted in FLOPs: the circuits run once per equation on the CPU (`circuit_calls` in the
+  train json). Arithmetic in all tag files was re-scored with both metrics; original wall
+  times are kept, the re-score time is `wall_time_rescore_arith_s`.
+

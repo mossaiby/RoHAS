@@ -1,0 +1,116 @@
+{
+ "meta": {
+  "git_commit": "2665639d66a8c09e26bd54f967fb6242e55f13a0",
+  "git_dirty": true,
+  "timestamp": "2026-11-08T21:28:12",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 733.6
+ },
+ "data": {
+  "name": "main_seeded_gate_circ",
+  "experts": [
+   "main_seeded_lang",
+   "main_seeded_facts",
+   "main_seeded_math",
+   "main_seeded_code",
+   "circuit"
+  ],
+  "mode": "prob",
+  "conf": true,
+  "circuit_calls": 19580,
+  "gate_params": 796677,
+  "tokens": 5996544,
+  "flops": 1009878826549248.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 2.532314368066202
+   },
+   {
+    "step": 146,
+    "loss": 2.2333844816129096
+   },
+   {
+    "step": 219,
+    "loss": 2.1249362418467928
+   },
+   {
+    "step": 292,
+    "loss": 2.096962351037813
+   },
+   {
+    "step": 365,
+    "loss": 2.0917965120001427
+   },
+   {
+    "step": 438,
+    "loss": 2.087125920522798
+   },
+   {
+    "step": 511,
+    "loss": 2.096012679942956
+   },
+   {
+    "step": 584,
+    "loss": 2.0991909524992
+   },
+   {
+    "step": 657,
+    "loss": 2.0872181144288757
+   },
+   {
+    "step": 730,
+    "loss": 2.0984899534401813
+   },
+   {
+    "step": 803,
+    "loss": 2.1076044746409717
+   },
+   {
+    "step": 876,
+    "loss": 2.09353494202724
+   },
+   {
+    "step": 949,
+    "loss": 2.0800104965390736
+   },
+   {
+    "step": 1022,
+    "loss": 2.0910838998740275
+   },
+   {
+    "step": 1095,
+    "loss": 2.0835928509393034
+   },
+   {
+    "step": 1168,
+    "loss": 2.064856864368989
+   },
+   {
+    "step": 1241,
+    "loss": 2.081573062030472
+   },
+   {
+    "step": 1314,
+    "loss": 2.0740549434561997
+   },
+   {
+    "step": 1387,
+    "loss": 2.099921674098003
+   },
+   {
+    "step": 1460,
+    "loss": 2.0888665922813723
+   }
+  ]
+ },
+ "macros": {}
+}

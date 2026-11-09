@@ -1,0 +1,121 @@
+{
+ "meta": {
+  "git_commit": "2665639d66a8c09e26bd54f967fb6242e55f13a0",
+  "git_dirty": true,
+  "timestamp": "2026-11-08T23:25:42",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 788.43
+ },
+ "data": {
+  "name": "main_seeded_gate_atom_mlp",
+  "experts": [
+   "main_seeded_lang",
+   "main_seeded_facts",
+   "main_seeded_math",
+   "main_seeded_code",
+   "circuit"
+  ],
+  "mode": "prob",
+  "conf": true,
+  "split": false,
+  "atom": true,
+  "veto": true,
+  "circuit_calls": 29656,
+  "gate_params": 796549,
+  "tokens": 5996544,
+  "flops": 1009874221203456.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 2.8350237397145412
+   },
+   {
+    "step": 146,
+    "loss": 2.3930172646467014
+   },
+   {
+    "step": 219,
+    "loss": 2.2029021592817415
+   },
+   {
+    "step": 292,
+    "loss": 2.1386290802505954
+   },
+   {
+    "step": 365,
+    "loss": 2.1193737017503396
+   },
+   {
+    "step": 438,
+    "loss": 2.108134346741705
+   },
+   {
+    "step": 511,
+    "loss": 2.11364189977825
+   },
+   {
+    "step": 584,
+    "loss": 2.114722682504657
+   },
+   {
+    "step": 657,
+    "loss": 2.101629275381604
+   },
+   {
+    "step": 730,
+    "loss": 2.1126411086826
+   },
+   {
+    "step": 803,
+    "loss": 2.1205111380249355
+   },
+   {
+    "step": 876,
+    "loss": 2.106167606240202
+   },
+   {
+    "step": 949,
+    "loss": 2.09264515422802
+   },
+   {
+    "step": 1022,
+    "loss": 2.1033967120089656
+   },
+   {
+    "step": 1095,
+    "loss": 2.0961280007221745
+   },
+   {
+    "step": 1168,
+    "loss": 2.0770137587716078
+   },
+   {
+    "step": 1241,
+    "loss": 2.0933383687171983
+   },
+   {
+    "step": 1314,
+    "loss": 2.0860726310559503
+   },
+   {
+    "step": 1387,
+    "loss": 2.1118983079170324
+   },
+   {
+    "step": 1460,
+    "loss": 2.1009161044043214
+   }
+  ],
+  "atom_head": "mlp",
+  "atom_lr": 0.001
+ },
+ "macros": {}
+}

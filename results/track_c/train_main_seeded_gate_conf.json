@@ -1,0 +1,115 @@
+{
+ "meta": {
+  "git_commit": "2665639d66a8c09e26bd54f967fb6242e55f13a0",
+  "git_dirty": true,
+  "timestamp": "2026-11-08T21:15:48",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 331.64
+ },
+ "data": {
+  "name": "main_seeded_gate_conf",
+  "experts": [
+   "main_seeded_lang",
+   "main_seeded_facts",
+   "main_seeded_math",
+   "main_seeded_code"
+  ],
+  "mode": "prob",
+  "conf": true,
+  "circuit_calls": 0,
+  "gate_params": 795908,
+  "tokens": 5996544,
+  "flops": 1009851158495232.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 2.4948180972085092
+   },
+   {
+    "step": 146,
+    "loss": 2.2419811140362964
+   },
+   {
+    "step": 219,
+    "loss": 2.1463453800178827
+   },
+   {
+    "step": 292,
+    "loss": 2.121442990987265
+   },
+   {
+    "step": 365,
+    "loss": 2.116955057882563
+   },
+   {
+    "step": 438,
+    "loss": 2.112922340859329
+   },
+   {
+    "step": 511,
+    "loss": 2.122621729606172
+   },
+   {
+    "step": 584,
+    "loss": 2.124713528030536
+   },
+   {
+    "step": 657,
+    "loss": 2.1140099432608204
+   },
+   {
+    "step": 730,
+    "loss": 2.1247118057225864
+   },
+   {
+    "step": 803,
+    "loss": 2.132893178675682
+   },
+   {
+    "step": 876,
+    "loss": 2.1189203449274365
+   },
+   {
+    "step": 949,
+    "loss": 2.105831318242203
+   },
+   {
+    "step": 1022,
+    "loss": 2.1171780563911464
+   },
+   {
+    "step": 1095,
+    "loss": 2.1119965134216447
+   },
+   {
+    "step": 1168,
+    "loss": 2.0925272865301743
+   },
+   {
+    "step": 1241,
+    "loss": 2.1084693576848665
+   },
+   {
+    "step": 1314,
+    "loss": 2.100861877808041
+   },
+   {
+    "step": 1387,
+    "loss": 2.1260718763118294
+   },
+   {
+    "step": 1460,
+    "loss": 2.1161326574071744
+   }
+  ]
+ },
+ "macros": {}
+}

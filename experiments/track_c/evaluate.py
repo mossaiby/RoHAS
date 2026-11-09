@@ -9,9 +9,12 @@ Metrics (same items for every system)
   facts     recall: the correct value must outrank every other value of that attribute
             (summed log-probability of " value"); prompts from held-out and training templates
   arith     exact match of greedy a op b = ..., by operator and digit count (training: +,- up
-            to 5 digits, * up to 3)
+            to 5 digits, * up to 3). The prompt ends after b; the first generated token is the
+            better of "=" and "=-" (the BPE merges "=-", so a prompt ending in "=" would rule
+            out negative results), then decoding is free until a newline
   word      exact match of the final answer in held-out word problems
-  routing   (gated systems) mean gate weight per true segment type on mixed validation text
+  routing   (gated systems) mean gate weight per true segment type on mixed validation text;
+            with the circuit expert, also its mean weight where it is active and where not
 Writes results/track_c/eval_<tag>.json.
 """
 import argparse
@@ -30,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from experiments.common import save  # noqa: E402
 from experiments.track_c import model as M, synth  # noqa: E402
 from experiments.track_c.data import OUT as DATA, TYPES  # noqa: E402
-from experiments.track_c.gate import load_gate, load_experts, expert_outputs, combine  # noqa: E402
+from experiments.track_c.gate import load_gate, load_experts, expert_outputs, combine, apply_vetoes  # noqa: E402
 from experiments.track_c.train import CKPT, tokens, batch  # noqa: E402
 
 
@@ -44,6 +47,9 @@ class Single:
         with torch.autocast("cuda", dtype=torch.bfloat16):
             return torch.log_softmax(self.m(x).float(), dim=-1), None
 
+    def last_logprobs(self, x):
+        return self.logprobs(x)[0][:, -1]
+
 
 class Gated:
     _cache = {}
@@ -51,6 +57,9 @@ class Gated:
     def __init__(self, gate_name, mode):
         self.name = f"gate:{gate_name}:{mode}"
         self.gate, ck = load_gate(gate_name)
+        # mode "prob_noveto" / "hard_noveto": the same gate with the atoms' vetoes switched off
+        self.veto = ck.get("veto", False) and not mode.endswith("_noveto")
+        mode = mode.removesuffix("_noveto")
         key = tuple(ck["experts"])
         if key not in Gated._cache:
             Gated._cache[key] = load_experts(ck["experts"])
@@ -59,8 +68,16 @@ class Gated:
     @torch.no_grad()
     def logprobs(self, x):
         logps, hs = expert_outputs(self.experts, x)
-        ll = self.gate(hs)
-        return combine(logps, ll, self.mode), ll
+        ll = self.gate(hs, logps)
+        lp = combine(logps, ll, self.mode)
+        return (apply_vetoes(lp, self.experts) if self.veto else lp), ll
+
+    @torch.no_grad()
+    def last_logprobs(self, x):
+        """Next-token log-probs (B, V) at the final position only (for greedy decoding)."""
+        logps, hs = expert_outputs(self.experts, x, last=True)
+        lp = combine(logps, self.gate(hs, logps, last=True), self.mode)
+        return (apply_vetoes(lp, self.experts) if self.veto else lp)[:, -1]
 
 
 def make_system(spec):
@@ -92,20 +109,31 @@ def routing(sys_, n_batches=40, bs=8, ctx=512):
     sums = np.zeros((len(TYPES), len(sys_.expert_names)))
     hits = np.zeros(len(TYPES))
     cnt = np.zeros(len(TYPES))
+    ci = sys_.expert_names.index("circuit") if "circuit" in sys_.expert_names else None
+    circ = np.zeros((2, 2))                                   # [inactive, active] x [sum lambda, count]
     for _ in range(n_batches):
         ix = rng.integers(0, len(arr) - ctx - 1, bs)
         x = torch.from_numpy(np.stack([arr[i:i + ctx] for i in ix]).astype(np.int64)).cuda()
         y = np.stack([lab[i + 1:i + ctx + 1] for i in ix])           # type of the predicted token
         _, ll = sys_.logprobs(x)
         lam = ll.exp().cpu().numpy()
+        if ci is not None:
+            act = np.stack([sys_.experts[ci].targets(r.tolist()) for r in x.cpu().numpy()]) >= 0
+            for k, m in ((0, ~act), (1, act)):
+                circ[k] += [lam[..., ci][m].sum(), m.sum()]
         for t in range(len(TYPES)):
             mask = y == t
             if mask.any():
                 sums[t] += lam[mask].sum(0)
                 cnt[t] += mask.sum()
-                if len(sys_.expert_names) == len(TYPES):      # experts are ordered as TYPES
+                if len(sys_.expert_names) >= len(TYPES):      # the first experts are ordered as TYPES
                     hits[t] += (lam[mask].argmax(-1) == t).sum()
-    return {"mean_lambda": {TYPES[t]: dict(zip(sys_.expert_names, (sums[t] / max(1, cnt[t])).round(4).tolist()))
+    extra = {}
+    if ci is not None:
+        extra = {"circuit_lambda_active": float(circ[1, 0] / max(1, circ[1, 1])),
+                 "circuit_lambda_inactive": float(circ[0, 0] / max(1, circ[0, 1])),
+                 "circuit_active_frac": float(circ[1, 1] / circ[:, 1].sum())}
+    return {**extra, "mean_lambda": {TYPES[t]: dict(zip(sys_.expert_names, (sums[t] / max(1, cnt[t])).round(4).tolist()))
                             for t in range(len(TYPES))},
             "argmax_accuracy": {TYPES[t]: float(hits[t] / max(1, cnt[t])) for t in range(len(TYPES))}}
 
@@ -167,10 +195,13 @@ def fact_recall(sys_, tok, persons, heldout, n_people=300, seed=0):
 
 
 @torch.no_grad()
-def greedy(sys_, tok, prompts, max_new, stop="\n"):
+def greedy(sys_, tok, prompts, max_new, stop="\n", first=None):
+    """Greedy continuations; `first` restricts the first generated token to these ids."""
     eot = tok.token_to_id("<|eot|>")
     enc = [[eot] + tok.encode(p).ids for p in prompts]
     outs = [None] * len(prompts)
+    # ids whose text contains the stop string: generation of a row is over once it emits one
+    ends = torch.tensor([i for i in range(tok.get_vocab_size()) if stop in tok.decode([i])] + [eot]).cuda()
     groups = {}
     for i, e in enumerate(enc):
         groups.setdefault(len(e), []).append(i)
@@ -178,9 +209,16 @@ def greedy(sys_, tok, prompts, max_new, stop="\n"):
         for s in range(0, len(idx), 128):
             sub = idx[s:s + 128]
             x = torch.tensor([enc[i] for i in sub]).cuda()
-            for _ in range(max_new):
-                lp, _ = sys_.logprobs(x[:, -512:])
-                x = torch.cat([x, lp[:, -1].argmax(-1, keepdim=True)], dim=1)
+            done = torch.zeros(len(sub), dtype=torch.bool, device=x.device)
+            for step in range(max_new):
+                nxt = sys_.last_logprobs(x[:, -512:])
+                if first is not None and step == 0:
+                    allowed = torch.tensor(first, device=nxt.device)
+                    nxt = torch.full_like(nxt, -float("inf")).index_copy(1, allowed, nxt[:, allowed])
+                x = torch.cat([x, nxt.argmax(-1, keepdim=True)], dim=1)
+                done |= torch.isin(x[:, -1], ends)
+                if done.all():
+                    break
             for r, i in enumerate(sub):
                 ids = x[r, L:].tolist()
                 if eot in ids:
@@ -189,19 +227,31 @@ def greedy(sys_, tok, prompts, max_new, stop="\n"):
     return outs
 
 
+ADD_DIGITS = list(range(1, 9)) + [12, 16, 24, 32]
+MUL_DIGITS = [1, 2, 3, 4, 6, 8]
+
+
 def arithmetic(sys_, tok, per_cell=50, seed=0):
+    """Exact-match accuracy per (op, digits): ("line") the generated line is exactly "=" + answer;
+    ("number") it starts with "=" + answer and the answer is not followed by another digit,
+    whatever non-digit comes next (a system may end the number right but not the line)."""
     rng = random.Random(seed)
-    cells = [("+", d) for d in range(1, 9)] + [("-", d) for d in range(1, 9)] + [("*", d) for d in range(1, 5)]
+    cells = [(op, d) for op in "+-" for d in ADD_DIGITS] + [("*", d) for d in MUL_DIGITS]
     items = []
     for op, d in cells:
         for _ in range(per_cell):
             q, a = synth.arith_line(rng, op, d, d)
-            items.append((op, d, q + "=", a))
-    outs = greedy(sys_, tok, [q for _, _, q, _ in items], max_new=18)
-    res = {}
+            items.append((op, d, q, a))
+    first = [tok.token_to_id("="), tok.token_to_id("=-")]
+    outs = greedy(sys_, tok, [q for _, _, q, _ in items], max_new=2 * max(ADD_DIGITS) + 2, first=first)
+    line, number = {}, {}
     for (op, d, _, a), o in zip(items, outs):
-        res.setdefault(op, {}).setdefault(str(d), []).append(int(o.strip() == a))
-    return {op: {d: float(np.mean(v)) for d, v in ds.items()} for op, ds in res.items()}
+        o, want = o.strip(), "=" + a
+        line.setdefault(op, {}).setdefault(str(d), []).append(int(o == want))
+        number.setdefault(op, {}).setdefault(str(d), []).append(
+            int(o.startswith(want) and not o[len(want):len(want) + 1].isdigit()))
+    mean = lambda res: {op: {d: float(np.mean(v)) for d, v in ds.items()} for op, ds in res.items()}  # noqa: E731
+    return mean(line), mean(number)
 
 
 def word_problems(sys_, tok, n=200, seed=1):
@@ -244,9 +294,9 @@ def main():
                 r["facts_new_heldout"] = fact_recall(s, tok, persons["new"], heldout=True)
                 r["facts_new_train_templates"] = fact_recall(s, tok, persons["new"], heldout=False)
         if "math" not in args.skip:
-            r["arith"] = arithmetic(s, tok)
+            r["arith"], r["arith_number"] = arithmetic(s, tok)
             r["word"] = word_problems(s, tok)
-        if isinstance(s, Gated):
+        if isinstance(s, Gated) and "routing" not in args.skip:
             r["routing"] = routing(s)
         results[s.name] = r
         print(s.name, f"({time.time() - t:.0f}s)", json.dumps(r), flush=True)
