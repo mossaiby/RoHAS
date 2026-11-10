@@ -8,6 +8,9 @@
 --mix gives each data source's share of training tokens (normalised). --flops sets the
 token budget from a FLOP budget (training FLOPs per token from model.flops_per_token).
 --init continues from a checkpoint (used for the "add facts" test).
+--own TYPE: for a source with a label file (<source>_labels.bin, e.g. the ctx_<type>_train
+files of data_context.py), only tokens labelled TYPE count in the loss; other sources are
+unaffected. Every token still costs a forward and backward pass, so the FLOPs are unchanged.
 Writes checkpoints/track_c/<name>.pt and results/track_c/train_<name>.json.
 """
 import argparse
@@ -34,10 +37,17 @@ def tokens(name):
     return np.memmap(os.path.join(DATA, f"{name}.bin"), dtype=np.uint16, mode="r")
 
 
-def batch(arr, n, ctx, rng):
+def batch(arr, n, ctx, rng, labels=None):
     ix = rng.integers(0, len(arr) - ctx - 1, n)
     x = np.stack([arr[i:i + ctx + 1] for i in ix]).astype(np.int64)
-    return torch.from_numpy(x)
+    if labels is None:
+        return torch.from_numpy(x)
+    return torch.from_numpy(x), torch.from_numpy(np.stack([labels[i:i + ctx + 1] for i in ix]).astype(np.int64))
+
+
+def labels(name):
+    path = os.path.join(DATA, f"{name}_labels.bin")
+    return np.memmap(path, dtype=np.uint8, mode="r") if os.path.exists(path) else None
 
 
 @torch.no_grad()
@@ -74,6 +84,8 @@ def main():
     ap.add_argument("--init", help="checkpoint to continue from")
     ap.add_argument("--evals", type=int, default=10)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--own", choices=["lang", "facts", "math", "code"],
+                    help="loss only on this type's tokens in labelled sources")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -91,6 +103,8 @@ def main():
     z = sum(mix.values())
     mix = {k: v / z for k, v in mix.items()}
     sources = {k: tokens(f"{k}_train") for k in mix}
+    TYPES = ["lang", "facts", "math", "code"]
+    lab = {k: labels(f"{k}_train") for k in mix} if args.own else {}
     names, probs = list(mix), np.array([mix[k] for k in mix])
 
     seqs = args.batch_tokens // args.ctx
@@ -122,10 +136,24 @@ def main():
         loss_acc = 0.0
         for _ in range(accum):
             counts = rng.multinomial(args.micro, probs)
-            xy = torch.cat([batch(sources[n], c, args.ctx, rng) for n, c in zip(names, counts) if c]).to(device)
+            xs, ys = [], []
+            for n, c in zip(names, counts):
+                if not c:
+                    continue
+                if lab.get(n) is not None:
+                    x, lb = batch(sources[n], c, args.ctx, rng, lab[n])
+                    y = x[:, 1:].clone()
+                    y[lb[:, 1:] != TYPES.index(args.own)] = -100      # other types: context only
+                else:
+                    x = batch(sources[n], c, args.ctx, rng)
+                    y = x[:, 1:]
+                xs.append(x)
+                ys.append(y)
+            xy, tgt = torch.cat(xs).to(device), torch.cat(ys).to(device)
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 logits = model(xy[:, :-1])
-            loss = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), xy[:, 1:].reshape(-1)) / accum
+            loss = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), tgt.reshape(-1),
+                                   ignore_index=-100) / accum
             loss.backward()
             loss_acc += loss.item()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -144,7 +172,7 @@ def main():
     elapsed = time.time() - t0
     save("track_c", f"train_{args.name}",
          {"name": args.name, "size": args.size, "params": model.n_params(), "flops_per_token": fpt,
-          "tokens": trained, "flops": fpt * trained, "mix": mix, "lr": lr, "init": args.init,
+          "tokens": trained, "flops": fpt * trained, "mix": mix, "lr": lr, "init": args.init, "own": args.own,
           "steps": steps, "batch_tokens": seqs * args.ctx, "curve": curve, "final": curve[-1]},
          seed=args.seed, wall_time=elapsed)
 

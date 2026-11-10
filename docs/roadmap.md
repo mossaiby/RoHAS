@@ -224,3 +224,172 @@ seeds, so the spread is gate variance only.
 - Eval wall times vary 4x between identical workloads in this run (other load on the machine);
   gate training times are consistent (330 s control, 795 s atom gate).
 
+
+### Track C mixed-text gap (`diag_mixed.py`, `data_context.py`, `run_context.py`)
+
+Where the seeded gate loses to mono_s on mixed text (2.162 vs 1.990; `diag_mixed_main.json`):
+- The per-token oracle over the four seeded experts (best expert per token, with hindsight) is
+  2.027, still above mono_s: better routing alone cannot close the gap.
+- The experts are bad inside foreign context, both in the first 16 tokens of a segment and
+  later (facts late: seeded gate 1.46, mono_s 0.62). Each expert only ever saw windows of its
+  own type, so it never learned to read past a change of type.
+
+Context exposure, f = 0.2 (`main_ctx20_*`, same seed model, recipe and FLOPs as the seeded
+experts). 20% of each branch's tokens are mixed documents where each segment is the expert's
+own type with probability 1/2. The loss is only on own-type tokens, so an expert learns to
+read foreign context but is never trained to predict it. Foreign segments come from material
+no expert stores: fictitious people (no stored name), TinyStories shard 3, and fresh math.
+Code reuses code_train files, so no deletion claim is made for code.
+- **Mixed: 1.828 (conf gate), 1.824 (atom gate), vs 2.162 seeded and 1.990 mono_s.** The
+  exposed system now beats the compute-matched monolithic model on mixed text. Label oracle
+  1.786, token oracle 1.755.
+- Early / late (first 16 tokens / rest), lang facts math code:
+  - Early: 2.51 1.10 1.55 3.30, vs seeded 3.55 2.35 2.21 4.05 and mono_s 2.77 1.34 1.62 3.56.
+  - Late: 2.06 0.44 0.52 2.14, vs seeded 2.57 1.46 0.66 2.22 and mono_s 2.28 0.62 0.54 2.32.
+- Pure-domain losses, expert alone (seeded → exposed):
+  - lang 1.612 → 1.633
+  - facts 0.614 → 0.458
+  - math 0.699 → 0.700
+  - code 1.987 → 1.995
+- Pure-domain losses, conf gate: lang 1.685 → 1.667, facts 0.882 → 0.498, math 0.734 → 0.741,
+  code 1.994 → 1.998.
+- The facts gain is a surprise, given fewer supervised facts tokens. A likely cause is that
+  short segments of 1-3 attributes in random order make the expert robust to the new orderings
+  in facts_val. This is not verified.
+- Fact recall: train templates 1.00. Held-out templates: expert 0.323 → 0.269, gate
+  0.246 → 0.227 (a small cost).
+- Purity holds. The lang, math and code experts recall stored facts at chance (0.013-0.023,
+  as before).
+- Circuit (atom gate): answer number exact in every development cell, word problems 1.00,
+  circuit weight 0.983 where active.
+- **Caveat: the exposure documents come from the same generator as mixed_val** (same segment
+  lengths and "\n\n" separators). Part of the gain may be format matching. mono_s and the gate
+  saw that format too (mixed_train), but the experts now train on it directly. A mixed
+  evaluation in a different format is needed before this goes in the paper.
+
+Format check (`data_mixed_ood.py`; `diag_mixed_long_main.json`, `diag_mixed_inline_main.json`).
+Two validation sets keep mixed_val's sources but change the format, which no model trained on:
+- **long**: 2-3 long segments joined by one newline.
+- **inline**: 4-8 short segments joined by a space or a newline, so the type changes
+  mid-paragraph.
+
+| system | mixed_val | long | inline |
+|---|---|---|---|
+| mono_s | 1.990 | 1.858 | 2.680 |
+| mono_m | 2.052 | 1.916 | 2.655 |
+| seeded gate (conf) | 2.162 | **1.788** | **2.592** |
+| exposed gate f=0.2 (conf) | **1.828** | **1.760** | 2.631 |
+| independent gate (conf) | 2.504 | 2.066 | 3.080 |
+
+- On formats nobody trained on, the seeded gate already beats mono_s **without exposure**: by
+  0.07 on long and 0.09 on inline. mono_s's lead on mixed_val is mostly familiarity with that
+  format, since mixed_train is 1.5% of its data. The seeded gate also saw mixed_train, but only
+  the gate learned from it; the experts never did.
+- **Exposure overfits the format.** It helps a little on long (−0.028) and hurts on inline
+  (+0.039). The worst cell is inline math early in a segment: label oracle 4.71 exposed vs 2.97
+  seeded. The exposed math expert expects foreign text to end with a blank line.
+- What exposure does help on inline is late in a segment (lang 2.27 vs 2.56, code 2.43 vs 2.55).
+  The early-token losses got worse.
+- The independent experts lose to mono_s everywhere. Their facts expert cannot read facts
+  inside other text (facts 3.6-4.3), so seeding is what makes mixed text work.
+- For the paper: report mixed loss on formats no expert or baseline was trained on. Exposure,
+  if kept, needs varied formats and a further held-out format family to test on.
+
+Varied-format exposure. Pre-registered 2026-11-10, before training.
+
+Setup:
+- Same recipe as main_ctx20 (f = 0.2, own-type loss, same pools), prefix `main_ctxv20`.
+- Each exposure document's format is drawn from `data_mixed_ood.VARIED`: blank-line joins with
+  short segments (build_mixed), single-newline joins with long segments (= the long eval
+  format), and triple-newline joins with medium segments.
+- Every join is a newline. That keeps two families held out from all training: inline, where
+  half the joins are spaces, and marked (`mixed_marked_val`: tab, " | " or " ; " joins).
+- The gate is still trained on mixed_train (build_mixed format), as for every other gate.
+
+Criteria (gate with confidence features, prob mixing):
+- Held-out families (inline, marked): main_ctxv20 at most the seeded gate's loss.
+- Training families (mixed_val, long): below the seeded gate's loss.
+- Purity: stored-fact recall of the lang, math and code experts stays at chance.
+- Own-type token share of the ctxv files: lang 0.316, facts 0.193, math 0.430, code 0.809
+  (ctx: 0.338, 0.228, 0.441, 0.789).
+
+Varied-format exposure results (`main_ctxv20`; `eval_main_ctxv20.json`, `diag_mixed_*main_ctxv20.json`,
+`diag_mixed_marked_main.json`). Mixed loss, gates with confidence features, prob mixing:
+
+| system | mixed_val (A) | long (A for ctxv) | inline (held out) | marked (held out) |
+|---|---|---|---|---|
+| mono_s | 1.990 | 1.858 | 2.680 | 2.258 |
+| mono_m | 2.052 | 1.916 | 2.655 | 2.285 |
+| seeded gate | 2.162 | 1.788 | 2.592 | 2.118 |
+| exposed, one format (ctx20) | **1.828** | 1.760 | 2.631 | 2.121 |
+| **exposed, varied (ctxv20)** | 1.920 | **1.657** | **2.359** | **2.025** |
+| independent gate | 2.504 | 2.066 | 3.080 | 2.470 |
+
+- **All pre-registered criteria are met:**
+  - Held out: inline −0.233 and marked −0.093 against the seeded gate.
+  - Training formats: mixed_val −0.242 and long −0.131.
+  - Purity: the lang, math and code experts recall stored facts at 0.019, 0.018 and 0.017 (chance).
+- ctxv20 beats mono_s and mono_m on all four families. ctx20 (one format) does no better than
+  the seeded gate on the held-out families, so the gain needs varied formats.
+- On mixed_val, ctxv20 is behind ctx20 (1.920 vs 1.828). That is the cost of not matching
+  that one format.
+- Pure-domain losses of the ctxv20 conf gate (seeded): lang 1.696 (1.685), facts 0.534
+  (0.882), math 0.724 (0.734), code 2.004 (1.994).
+- Fact recall: training templates 0.998. Held-out templates: expert 0.337 (seeded 0.323),
+  gate 0.270 (0.246).
+- Atom gate: answer number exact in every development cell, word problems 1.00. Circuit weight
+  0.973 where active and 0.0024 where inactive (seeded 1.7e-6). Losses are unaffected.
+- Limits:
+  - One run: one exposure draw and one gate seed.
+  - The held-out families are only two, and I designed them.
+  - The gate itself only ever trains on the build_mixed format.
+
+Varied exposure, follow-up (`run_ctxv_followup.py`; `eval_main_ctxv20_{seeds,add_facts,heldout}.json`,
+`diag_mixed_*_main_ctxv20_followup.json`, `diag_mixed_*_main_add_replay_all.json`).
+- **Gate seeds**, experts fixed, conf gate, seeds 0/1/2:
+  - mixed_val 1.920/1.919/1.920
+  - long 1.657/1.658/1.659
+  - inline 2.359/2.360/2.361
+  - marked 2.025/2.027/2.029
+
+  The gate adds no meaningful spread. Expert seeds are still untested.
+- **Atom gate seeds:** answer number exact in every development and held-out cell for all
+  three seeds; word problems 1.00. The circuit weight where active is 0.973/0.512/0.940. Seed 1
+  sits just above the 0.5 that decides the argmax, so it is exact but fragile. The
+  confidence-only gate gets 0 from 7 digits.
+- **Adding 500 people** (seeded recipe, no exposure in the update, gate weights unchanged).
+  With replay: old-fact recall 0.994 (training templates) and 0.269 (held-out templates); new
+  people 0.993 and 0.191. The seeded updated expert gets 0.988/0.249 old and 0.986/0.208 new.
+  lang, math and code are unchanged, since those experts are not touched.
+- Mixed loss after the update with replay:
+
+  | system | mixed_val | long | inline | marked |
+  |---|---|---|---|---|
+  | ctxv20 conf gate, before | 1.920 | 1.657 | 2.359 | 2.025 |
+  | ctxv20 conf gate, after | 1.960 | 1.672 | 2.422 | 2.042 |
+  | seeded conf gate, after | 2.177 | 1.796 | 2.615 | 2.130 |
+  | mono_s, fair update (replay_all) | 2.223 | 2.009 | 2.855 | 2.430 |
+  | mono_m, fair update (replay_all) | 2.234 | 2.014 | 2.773 | 2.384 |
+
+  - After one update the varied-exposure system beats every updated baseline on every format,
+    by 0.26-0.43 against mono_s.
+  - The update gives back 0.015-0.063 of the gain, all of it in facts segments (mixed_val
+    facts late 0.59 → 1.04). An update without exposure partly unlearns reading facts inside
+    other text.
+  - Next: an update that keeps the exposure (ctxv-style documents with old and new people as
+    the own type).
+- **An update that keeps the exposure** (`replay_ctx`; `data_context.py --update`):
+  - Same 25M tokens and same new-fact share (1/2) as replay; the rest is 0.3 old facts and
+    0.2 varied-format exposure documents, with old and new people as the own type.
+  - **Mixed loss is fully recovered:** 1.921 / 1.657 / 2.356 / 2.024 (mixed_val / long /
+    inline / marked), vs 1.920 / 1.657 / 2.359 / 2.025 before the update. mixed_val facts
+    late: 0.60.
+  - **Recall is the best of any update:** old facts 0.998 (training templates) and 0.297
+    (held-out templates); new people 0.996 and 0.234. Plain replay gives 0.994/0.269 and
+    0.993/0.191; seeded replay 0.988/0.249 and 0.986/0.208.
+  - Pure-domain losses of the conf gate: lang 1.706 (1.696 before the update), facts 0.607,
+    math 0.723, code 2.002. The lang expert is unchanged, so the +0.01 on lang comes from the
+    updated facts expert's share in the mixture.
+  - Atom gate: the circuit weight where active (0.973) is unchanged. Arithmetic was not re-run,
+    since the update does not touch the math expert or the circuit.
+  - Recipe for the paper: an expert update keeps the expert's exposure mix.

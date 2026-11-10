@@ -157,15 +157,25 @@ def segments(kind, rng, pools):
     return "\n".join(lines[i:i + k]).strip("\n")
 
 
-def build_mixed(tok, split, pools, target, seed):
+def build_mixed(tok, split, pools, target, seed, own=None, name=None):
+    """Mixed documents of 3-5 segments of at least two types. With `own` (a type), each
+    segment is that type with probability 1/2 and every document has at least one segment of
+    it (the context-exposure data of data_context.py). Writes <name or mixed_split>.bin and a
+    parallel _labels.bin with each token's segment type."""
     rng = random.Random(seed)
+    name = name or f"mixed_{split}"
     eot = tok.token_to_id(EOT)
     sep = tok.encode("\n\n").ids
     ids, labels = [], []
     while len(ids) < target:
         while True:
-            kinds = [rng.choice(TYPES) for _ in range(rng.randint(3, 5))]
-            if len(set(kinds)) >= 2:
+            n = rng.randint(3, 5)
+            if own is None:
+                kinds = [rng.choice(TYPES) for _ in range(n)]
+            else:
+                others = [t for t in TYPES if t != own]
+                kinds = [own if rng.random() < 0.5 else rng.choice(others) for _ in range(n)]
+            if len(set(kinds)) >= 2 and (own is None or own in kinds):
                 break
         for j, k in enumerate(kinds):
             seg = segments(k, rng, pools)
@@ -176,9 +186,9 @@ def build_mixed(tok, split, pools, target, seed):
             labels += [TYPES.index(k)] * len(t)
         ids.append(eot)
         labels.append(labels[-1])
-    np.array(ids, np.uint16).tofile(os.path.join(OUT, f"mixed_{split}.bin"))
-    np.array(labels, np.uint8).tofile(os.path.join(OUT, f"mixed_{split}_labels.bin"))
-    print(f"  mixed_{split}: {len(ids):,} tokens", flush=True)
+    np.array(ids, np.uint16).tofile(os.path.join(OUT, f"{name}.bin"))
+    np.array(labels, np.uint8).tofile(os.path.join(OUT, f"{name}_labels.bin"))
+    print(f"  {name}: {len(ids):,} tokens", flush=True)
     return len(ids)
 
 
