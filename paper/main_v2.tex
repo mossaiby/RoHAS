@@ -28,8 +28,14 @@ generalise beyond the lengths seen in training, and prose needs distribution mat
 study the alternative of training one expert per data type, each under its own regime, and
 combining them with a learned per-token gate that can also abstain. Experts can be trained
 networks, \emph{compiled} transformers whose weights are written by hand, or external tools,
-and all enter through the same calibrated read~\citep{mossaiby_roas}. \pending{Track C
-headline: experts + gate vs.\ monolithic model at matched compute.} \pending{Track B headline:
+and all enter through the same calibrated read~\citep{mossaiby_roas}. In a from-scratch study at
+matched compute, experts that are exposed to foreign context in varied formats, combined by the
+gate, beat a monolithic model on mixed text in every format we test, including two held out from
+all training (\resTrackCMixedInlineVaried{} vs.\ \resTrackCMixedInlineMonoS{} and
+\resTrackCMixedMarkedVaried{} vs.\ \resTrackCMixedMarkedMonoS{} nats per token). New facts are
+added by updating one expert, with no change elsewhere, while the monolithic model loses on
+every other data type. A compiled arithmetic expert under the same gate gives exact answers to
+32 digits. \pending{Track B headline:
 pretrained experts sharing a tokenizer; swap test.} Compiled arithmetic experts and an
 expression-parser expert that calls them are exact on \resTrackACorrectnessCases{} test cases
 with \resTrackACorrectnessErrors{} errors, at operand lengths where prompted models of up to
@@ -267,8 +273,177 @@ against operand size. The averages are over 5 random cases, or 2 cases above 16 
 % =====================================================================================
 \section{Training experts from scratch}
 \label{sec:scratch}
-\todo{Track C: data, regimes, monolithic baselines at matched compute, gate, results; go/no-go
-outcome decides the framing of the paper.}
+
+This section tests H1 and H2 in a setting small enough to control completely: every expert and
+every baseline is trained from scratch on the same data with the same tokenizer and the same
+total compute.
+
+\subsection{Setup}
+\label{sec:scratch_setup}
+
+\paragraph{Data.} Four data types share one byte-level BPE tokenizer with 8{,}192 tokens, in
+which every digit is a single token. \emph{Stories} are TinyStories~\citep{eldan2023tinystories}.
+\emph{Biographies} are synthetic: 2{,}000 fictitious people with six attributes each (birth
+year and city, university, major, employer, work city), written as 20 biographies per person
+from training templates; recall is tested with training templates and with held-out templates
+the model never saw. \emph{Math} is synthetic arithmetic (operands of up to 5 digits for $+$ and $-$,
+3 digits for $\times$) and templated word problems. \emph{Code} is Python from
+CodeParrot~\citep{codeparrot}, deduplicated and split by repository. \emph{Mixed} documents
+join 3--5 short segments of at least two types with blank lines, with a label per token that is
+used only for analysis.
+
+\paragraph{Models and compute.} Every expert is a decoder-only transformer with
+\resTrackCParamsS{} parameters (8 layers, $d_{\mathrm{model}}=384$). Every system gets
+$\resTrackCFlops$ training FLOPs. We compare four systems at this budget.
+\begin{itemize}
+\item \textbf{mono\_s}: one model of expert size, trained on \resTrackCMonoSTokens{} tokens of all
+four types plus 1.5\% mixed documents.
+\item \textbf{mono\_m}: a model four times larger (\resTrackCParamsM{}) on \resTrackCMonoMTokens{}
+tokens of the same mixture.
+\item \textbf{Independent experts}: four experts, each trained from scratch on 100M tokens of its
+own type only.
+\item \textbf{Seeded experts}: a shared seed model trained on \resTrackCSeedTokens{} tokens of
+all four types, branched into four experts trained on 50M tokens of their own type each, as in
+Branch-Train-Merge~\citep{li2022btm}.
+\end{itemize}
+The gate (\resTrackCGateParams{} parameters) is trained on 6M tokens of mixed documents with the
+experts frozen, by maximising the likelihood of the probability mixture
+$p(y\mid x)=\sum_e \lambda_e(x)\,p_e(y\mid x)$; it never sees routing labels. It reads each
+expert's last hidden state, its mean over the last 32 positions, and two confidence features per
+expert (the entropy and the largest log-probability of its next-token distribution). Gate
+training adds \resTrackCGateFlopsPct\% to the budget.
+
+\subsection{Per-type results}
+\label{sec:scratch_types}
+
+Table~\ref{tab:scratch_types} gives the loss on held-out data of each type and fact recall. The
+experts are better than both monolithic models on stories and code. They also recall far more
+facts, with training templates and, by a factor of about four, with held-out templates. The
+monolithic models are better on biography loss and, narrowly, on math. mono\_m is undertrained at this budget and is worse than mono\_s on every
+type. Section~\ref{sec:scratch_context} explains the last two rows.
+\begin{table}[t]
+\centering\small
+\caption{Loss on held-out data of each type, and fact recall (fraction of attributes answered
+exactly) with the biography templates used in training and with held-out templates. Gated
+systems use probability mixing; all systems have the same training compute.}
+\label{tab:scratch_types}
+\IfFileExists{tables/track_c_types.tex}{\input{tables/track_c_types}}{\pending{table}}
+\end{table}
+
+\subsection{Mixed text and context exposure}
+\label{sec:scratch_context}
+
+On the mixed validation documents the seeded system loses to mono\_s
+(\resTrackCMixedMixedSeeded{} against \resTrackCMixedMixedMonoS{} nats per token;
+Table~\ref{tab:scratch_mixed}, first column). The loss is not a routing failure. An oracle that
+picks the best expert for every token with hindsight still scores \resTrackCOracleTokenSeeded,
+above mono\_s. The experts themselves are worse inside mixed documents, both at the start of a
+segment and well into it, because each one only ever saw windows of its own type.
+
+\paragraph{Context exposure.} We therefore give each expert a fraction $f=0.2$ of its branch
+tokens as mixed documents in which each segment is the expert's own type with probability
+$1/2$, and compute the loss only on its own type's tokens. The expert learns to read foreign
+context but is never trained to predict it, and the compute is unchanged. Foreign segments come
+from material that no expert stores. They are biographies of a separate set of fictitious people,
+stories from a TinyStories shard that no expert trains on, and freshly generated math, so that
+facts remain in the facts expert alone. We check this: after exposure, the other experts recall
+stored facts at chance level.
+
+\paragraph{Format matters.} Exposure with documents built like the validation set lowers its loss
+to \resTrackCMixedMixedOneFormat, below mono\_s. But that gain is partly a format match. We
+built three further mixed sets that no system trains on: \emph{long} segments joined by a
+single newline, \emph{inline} switches inside a paragraph, and \emph{marked} segments joined by
+tabs, ``$|$'' or ``;''. On these, the one-format exposure helps little or hurts
+(Table~\ref{tab:scratch_mixed}). They also show that mono\_s's lead on the original set came
+largely from having trained on its format. Even without exposure, the seeded system beats
+mono\_s on all three new formats.
+
+We then varied the format of the exposure documents, drawing each document's segment lengths and
+separator from three newline-based formats. Before training, we fixed the inline and marked sets
+as held out (their joins are spaces, tabs and other symbols) and fixed the success criteria.
+Varied exposure meets all of them. On the held-out formats it lowers the loss against the
+seeded system from \resTrackCMixedInlineSeeded{} to \resTrackCMixedInlineVaried{} (inline) and
+from \resTrackCMixedMarkedSeeded{} to \resTrackCMixedMarkedVaried{} (marked). It beats both
+monolithic models on all four formats, at a cost of at most 0.01 nats on the experts' own data.
+Retraining the experts with \resTrackCExpertSeeds{} data orders from the same seed model (the
+gates are retrained, with their seed fixed) changes these losses very little: the standard
+deviation is at most \resTrackCMixedMarkedVariedSd{} nats on any format
+(Table~\ref{tab:scratch_mixed}, last row). Even the worst seed (\resTrackCMixedInlineVariedMax{}
+inline, \resTrackCMixedMarkedVariedMax{} marked) beats every other system in the table.
+\begin{table}[t]
+\centering\small
+\caption{Loss on mixed text (nats per token) in four formats. Only the first (blank lines) is
+the format of the gate's training documents and of mono\_s's mixed data. Inline and marked are
+held out from all training, including the varied exposure.}
+\label{tab:scratch_mixed}
+\IfFileExists{tables/track_c_mixed.tex}{\input{tables/track_c_mixed}}{\pending{table}}
+\end{table}
+
+\subsection{A compiled expert under the learned gate}
+\label{sec:scratch_circuit}
+
+The compiled circuits of Section~\ref{sec:compiled} join the gate as a fifth expert. The circuit
+expert reads token identities only. When the context ends in an equation \texttt{a op b =}
+followed by a prefix of its own answer, it predicts the next answer token with probability
+$1-10^{-4}$. Elsewhere it abstains with the uniform distribution, the null atom. It also emits
+two vetoes (anti-atoms): the wrong-sign variant of ``='' while $b$ is being written, and any
+digit after a complete answer. Vetoes are applied after mixing.
+
+Hidden states of language-model experts encode properties such as the length of the current
+number, and a gate that reads them learns to distrust the circuit on long operands, beyond the
+lengths seen in training. We therefore make the gate two-level. The circuit's weight depends only
+on its own two confidence features, measured in nats, through a linear head. The language-model
+experts share the remaining weight, split by the hidden-state gate as before. With this design
+the gate puts weight \resTrackCCircuitLambdaActive{} on the circuit where it is active and
+essentially zero elsewhere. Again no routing labels are used.
+
+Table~\ref{tab:scratch_arith} gives exact-answer accuracy on items not used during development.
+Every trained system, including mono\_s, fails from 8 digits ($+$, $-$) or 4 digits ($\times$).
+With the circuit, the gated system is exact at every length tested, up to 32 digits, for each of
+three gate seeds, and solves every word problem. Its losses on the four data types and on mixed
+text are unchanged. \pending{Line ending beyond 16 digits; vetoes-off and hard-routing
+ablations go to Section~\ref{sec:ablations}.}
+\begin{table}[t]
+\centering\small
+\caption{Arithmetic on held-out items: percentage of answers whose number is exact, against
+digits per operand (100 items per cell), and word problems.}
+\label{tab:scratch_arith}
+{\footnotesize\setlength{\tabcolsep}{2.5pt}\IfFileExists{tables/track_c_arith.tex}{\input{tables/track_c_arith}}{\pending{table}}}
+\end{table}
+
+\subsection{Adding facts after training}
+\label{sec:scratch_update}
+
+To test H2 we add 500 new people after training. The gated system updates only its facts
+expert, on 25M tokens: half new biographies, half replay. The gate and the other experts are left
+untouched. The monolithic models need replay of all four data types to avoid forgetting, so we
+give them half new biographies and half replay of all four types, at 50M tokens (twice the
+expert update). Table~\ref{tab:scratch_update} shows the result.
+\begin{itemize}
+\item The monolithic models learn the new facts but lose on every other type: mono\_s gets worse
+on stories, on code and on every mixed format, and forgets old facts.
+\item The gated system's other experts are unchanged by construction, and old and new facts are
+both recalled.
+\item An update without exposure gives back a little of the mixed-text gain, all of it in
+biography segments. If the update keeps the expert's exposure mix, the mixed-text loss returns
+to its pre-update value on every format, and recall is the best of any update
+(\resTrackCUpdOldRecall{} old and \resTrackCUpdNewRecall{} new, training templates).
+\end{itemize}
+\begin{table}[t]
+\centering\small
+\caption{Adding 500 people after training. ``Update'' is fine-tuning with replay: of all four
+data types for the monolithic models (50M tokens), and of old biographies for the facts expert
+(25M tokens), with or without its exposure documents. Loss in nats per token; recall with
+training templates.}
+\label{tab:scratch_update}
+{\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_c_update.tex}{\input{tables/track_c_update}}{\pending{table}}}
+\end{table}
+
+\paragraph{Limitations of this study.} The models are small and the facts and arithmetic are
+synthetic. The mixed formats were designed by us, and two held-out families are few. The gate
+itself trains on a single format. We repeat the expert training over \resTrackCExpertSeeds{} data
+orders, but all seeds branch from one seed model and the baselines are trained once. Sections~\ref{sec:pretrained}
+and~\ref{sec:frozen} test the same ideas with pretrained models.
 
 \section{Pretrained experts that share a tokenizer}
 \label{sec:pretrained}

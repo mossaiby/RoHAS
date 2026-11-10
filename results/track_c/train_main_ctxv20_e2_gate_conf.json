@@ -1,0 +1,121 @@
+{
+ "meta": {
+  "git_commit": "2430242e7bca9fbe472c01b2b425460e23a61d2d",
+  "git_dirty": true,
+  "timestamp": "2026-11-10T17:20:37",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 335.1
+ },
+ "data": {
+  "name": "main_ctxv20_e2_gate_conf",
+  "experts": [
+   "main_ctxv20_e2_lang",
+   "main_ctxv20_e2_facts",
+   "main_ctxv20_e2_math",
+   "main_ctxv20_e2_code"
+  ],
+  "mode": "prob",
+  "conf": true,
+  "split": false,
+  "atom": false,
+  "veto": false,
+  "atom_head": null,
+  "atom_lr": null,
+  "atom_units": null,
+  "circuit_calls": 0,
+  "gate_params": 795908,
+  "tokens": 5996544,
+  "flops": 1009851158495232.0,
+  "curve": [
+   {
+    "step": 73,
+    "loss": 2.1962038015229357
+   },
+   {
+    "step": 146,
+    "loss": 1.9572980182442064
+   },
+   {
+    "step": 219,
+    "loss": 1.8747145495364381
+   },
+   {
+    "step": 292,
+    "loss": 1.8521597749890757
+   },
+   {
+    "step": 365,
+    "loss": 1.850536205632297
+   },
+   {
+    "step": 438,
+    "loss": 1.8467860249683343
+   },
+   {
+    "step": 511,
+    "loss": 1.8547581910893838
+   },
+   {
+    "step": 584,
+    "loss": 1.8581217072397997
+   },
+   {
+    "step": 657,
+    "loss": 1.8511112702838388
+   },
+   {
+    "step": 730,
+    "loss": 1.8625651340130398
+   },
+   {
+    "step": 803,
+    "loss": 1.873659418296841
+   },
+   {
+    "step": 876,
+    "loss": 1.857682919410357
+   },
+   {
+    "step": 949,
+    "loss": 1.8428350617993048
+   },
+   {
+    "step": 1022,
+    "loss": 1.8555486560694368
+   },
+   {
+    "step": 1095,
+    "loss": 1.8467659034554507
+   },
+   {
+    "step": 1168,
+    "loss": 1.8330650514757956
+   },
+   {
+    "step": 1241,
+    "loss": 1.8508471517299712
+   },
+   {
+    "step": 1314,
+    "loss": 1.8339819073002366
+   },
+   {
+    "step": 1387,
+    "loss": 1.86620590833905
+   },
+   {
+    "step": 1460,
+    "loss": 1.8545848306184796
+   }
+  ]
+ },
+ "macros": {}
+}

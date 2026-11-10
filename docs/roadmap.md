@@ -393,3 +393,18 @@ Varied exposure, follow-up (`run_ctxv_followup.py`; `eval_main_ctxv20_{seeds,add
   - Atom gate: the circuit weight where active (0.973) is unchanged. Arithmetic was not re-run,
     since the update does not touch the math expert or the circuit.
   - Recipe for the paper: an expert update keeps the expert's exposure mix.
+- **Expert seeds** (`run_context.py --varied --seed 1|2`; prefixes main_ctxv20_e1, _e2):
+  - Each seed retrains the four experts with another data order from the same seed model
+    (main_seeded_seed), then the conf and atom gates with gate seed 0.
+  - Mixed loss of the conf gate, mean ± sd over 3 seeds: 1.920 ± 0.001 (mixed_val),
+    1.658 ± 0.002 (long), 2.353 ± 0.005 (inline), 2.027 ± 0.005 (marked). The worst seed
+    (1.921 / 1.660 / 2.359 / 2.033) still beats every other system on every format, by at
+    least 0.07 nats.
+  - Pure-domain losses vary by ≤ 0.014 (facts 0.526–0.540). Recall on training templates
+    0.998–1.000 and on held-out templates 0.27–0.30.
+  - Purity holds for every seed: the lang, math and code experts recall facts at 0.015–0.022.
+  - Atom gate is exact on every arithmetic cell and on all word problems for every seed; its
+    circuit weight where active is 0.973–0.980.
+  - Not covered: the seed model and the baselines are single runs.
+  - The run was paused by hibernation during the e2 atom-gate eval. Only losses and
+    accuracies come from it, so no numbers are affected.

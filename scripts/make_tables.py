@@ -103,6 +103,182 @@ BUILDERS = [
 ]
 
 
+# ---- track C ------------------------------------------------------------------------
+TYPES = ["lang", "facts", "math", "code"]
+FORMATS = [("mixed", "Blank lines"), ("long", "Long"), ("inline", "Inline"), ("marked", "Marked")]
+
+
+def ev(res, tag, system):
+    """One system's entry in results/track_c/eval_<tag>.json (None if absent)."""
+    r = res.get(f"track_c/eval_{tag}")
+    return r["data"]["systems"].get(system) if r else None
+
+
+def fmt3(v):
+    return "--" if v is None else f"{v:.3f}"
+
+
+def fmt2(v):
+    return "--" if v is None else f"{v:.2f}"
+
+
+# (label, eval tag, eval system, unused, diag system)
+C_SYSTEMS = [
+    ("mono\\_s", "main", "model:main_mono_s", "main", "main_mono_s"),
+    ("mono\\_m", "main", "model:main_mono_m", "main", "main_mono_m"),
+    ("independent experts", "main_circuit_seeds", "gate:main_gate_conf:prob", "main", "main_gate_conf:prob"),
+    ("seeded experts", "main_circuit", "gate:main_seeded_gate_conf:prob", "main", "main_seeded_gate_conf:prob"),
+    ("+ exposure, one format", "main_ctx20", "gate:main_ctx20_gate_conf:prob", None, "main_ctx20_gate_conf:prob"),
+    ("+ exposure, varied formats", "main_ctxv20", "gate:main_ctxv20_gate_conf:prob", None, "main_ctxv20_gate_conf:prob"),
+]
+
+
+def diag_any(res, fmt, system):
+    """Mixed-text loss of a system, searching every diag file of that format."""
+    pre = "track_c/diag_mixed_"
+    for key, r in res.items():
+        if not key.startswith(pre):
+            continue
+        rest = key[len(pre):]
+        is_fmt = rest.startswith(fmt + "_") if fmt != "mixed" else \
+            not any(rest.startswith(f + "_") for f, _ in FORMATS[1:]) or rest.startswith("mixed_")
+        if is_fmt and system in r["data"]["systems"]:
+            return r["data"]["systems"][system]["all"]
+    return None
+
+
+def table_track_c_types(res):
+    rows = []
+    for label, tag, sysname, _, _ in C_SYSTEMS:
+        e = ev(res, tag, sysname)
+        if not e:
+            continue
+        loss = " & ".join(fmt3(e["loss"][t]) for t in TYPES)
+        rows.append(f"{label} & {loss} & {fmt2(e['facts_train_templates']['all'])} & "
+                    f"{fmt2(e['facts_heldout']['all'])} \\\\")
+    return tabular("lrrrrrr", r"System & \multicolumn{4}{c}{Loss (nats per token)} & \multicolumn{2}{c}{Fact recall} \\"
+                   "\n" r"& Stories & Biographies & Math & Code & Train.\ templ. & Held-out templ.", rows)
+
+
+def seed_rows(res, prefix, label):
+    """Mean and standard deviation over the expert seeds that exist (seed 0 and _e1, _e2, ...)."""
+    import statistics
+    names = [f"{prefix}_gate_conf:prob"] + [f"{prefix}_e{s}_gate_conf:prob" for s in range(1, 10)]
+    cells, n = [], 0
+    for f, _ in FORMATS:
+        vals = [v for v in (diag_any(res, f, nm) for nm in names) if v is not None]
+        n = max(n, len(vals))
+        cells.append("--" if len(vals) < 2 else f"{statistics.mean(vals):.3f} $\\pm$ {statistics.stdev(vals):.3f}")
+    return None if n < 2 else label.format(n=n) + " & " + " & ".join(cells) + r" \\"
+
+
+def table_track_c_mixed(res):
+    rows = []
+    for label, _, _, _, dsys in C_SYSTEMS:
+        rows.append(f"{label} & " + " & ".join(fmt3(diag_any(res, f, dsys)) for f, _ in FORMATS) + r" \\")
+    s = seed_rows(res, "main_ctxv20", r"\quad mean $\pm$ sd, {n} expert seeds")
+    if s:
+        rows.append(s)
+    head = "System & " + " & ".join(n for _, n in FORMATS)
+    return tabular("lrrrr", head, rows)
+
+
+def table_track_c_arith(res):
+    plus, times = ["1", "2", "4", "8", "16", "32"], ["1", "2", "4", "8"]
+    systems = [("mono\\_s", "main_heldout", "model:main_mono_s"),
+               ("seeded experts, no circuit", "main_heldout", "gate:main_seeded_gate_conf:prob"),
+               ("varied exposure, no circuit", "main_ctxv20_heldout", "gate:main_ctxv20_gate_conf:prob"),
+               ("varied exposure + circuit", "main_ctxv20_heldout", "gate:main_ctxv20_gate_atom:prob")]
+    rows = []
+    for label, tag, sysname in systems:
+        e = ev(res, tag, sysname)
+        if not e:
+            continue
+        a = e["arith_number"]
+        cells = [f"{100 * a['+'][d]:.0f}" for d in plus] + [f"{100 * a['-'][d]:.0f}" for d in plus] + \
+                [f"{100 * a['*'][d]:.0f}" for d in times]
+        rows.append(f"{label} & " + " & ".join(cells) + f" & {100 * e['word']:.0f} \\\\")
+    head = (r"& \multicolumn{6}{c}{$+$} & \multicolumn{6}{c}{$-$} & \multicolumn{4}{c}{$\times$} & Word \\" "\n"
+            "System & " + " & ".join(plus + plus + times) + " & probl.")
+    return tabular("l" + "r" * 17, head, rows)
+
+
+def table_track_c_update(res):
+    """After adding 500 people. Loss on stories and code, mixed loss in every format, recall."""
+    systems = [
+        ("mono\\_s, before", "main", "model:main_mono_s", "main_mono_s"),
+        ("mono\\_s, update", "main_add_facts", "model:main_add_replay_all_mono_s", "main_add_replay_all_mono_s"),
+        ("mono\\_m, update", "main_add_facts", "model:main_add_replay_all_mono_m", "main_add_replay_all_mono_m"),
+        ("seeded, update", "main_ctxv20_add_facts", "gate:main_seeded_gate_conf_add_replay:prob",
+         "main_seeded_gate_conf_add_replay:prob"),
+        ("varied exposure, before", "main_ctxv20", "gate:main_ctxv20_gate_conf:prob", "main_ctxv20_gate_conf:prob"),
+        ("varied exposure, update", "main_ctxv20_add_facts", "gate:main_ctxv20_gate_conf_add_replay:prob",
+         "main_ctxv20_gate_conf_add_replay:prob"),
+        ("varied exposure, update with exposure", "main_ctxv20_add_facts",
+         "gate:main_ctxv20_gate_conf_add_replay_ctx:prob", "main_ctxv20_gate_conf_add_replay_ctx:prob"),
+    ]
+    rows = []
+    for label, tag, sysname, dsys in systems:
+        e = ev(res, tag, sysname)
+        if not e:
+            continue
+        mixed = " & ".join(fmt3(diag_any(res, f, dsys)) for f, _ in FORMATS)
+        rows.append(f"{label} & {fmt3(e['loss']['lang'])} & {fmt3(e['loss']['code'])} & {mixed} & "
+                    f"{fmt2(e['facts_train_templates']['all'])} & {fmt2(e['facts_new_train_templates']['all'])} \\\\")
+    head = (r"& & & \multicolumn{4}{c}{Mixed text} & \multicolumn{2}{c}{Recall} \\" "\n"
+            "System & Stories & Code & " + " & ".join(n for _, n in FORMATS) + " & Old & New")
+    return tabular("lrrrrrrrr", head, rows)
+
+
+C_TABLES = [("track_c_types", table_track_c_types), ("track_c_mixed", table_track_c_mixed),
+            ("track_c_arith", table_track_c_arith), ("track_c_update", table_track_c_update)]
+
+
+def track_c_macros(res):
+    out = {}
+
+    def put(name, v, f=fmt3):
+        if v is not None:
+            out[("track_c", name)] = f(v)
+    tr = lambda n: res.get(f"track_c/train_{n}", {}).get("data", {})  # noqa: E731
+    if tr("main_mono_s"):
+        out[("track_c", "ParamsS")] = f"{tr('main_mono_s')['params'] / 1e6:.1f}M"
+        out[("track_c", "ParamsM")] = f"{tr('main_mono_m')['params'] / 1e6:.1f}M"
+        out[("track_c", "Flops")] = f"{tr('main_mono_s')['flops']:.1e}".replace("e+", r"\times 10^{") + "}"
+        out[("track_c", "MonoSTokens")] = f"{tr('main_mono_s')['tokens'] / 1e6:.0f}M"
+        out[("track_c", "MonoMTokens")] = f"{tr('main_mono_m')['tokens'] / 1e6:.0f}M"
+        out[("track_c", "SeedTokens")] = f"{tr('main_seeded_seed')['tokens'] / 1e6:.0f}M"
+        out[("track_c", "GateParams")] = f"{tr('main_ctxv20_gate_atom')['gate_params'] / 1e3:.0f}k"
+        out[("track_c", "GateFlopsPct")] = f"{100 * tr('main_ctxv20_gate_atom')['flops'] / tr('main_mono_s')['flops']:.0f}"
+    for f, _ in FORMATS:
+        cap = f.capitalize()
+        put(f"Mixed{cap}MonoS", diag_any(res, f, "main_mono_s"))
+        put(f"Mixed{cap}Seeded", diag_any(res, f, "main_seeded_gate_conf:prob"))
+        put(f"Mixed{cap}Varied", diag_any(res, f, "main_ctxv20_gate_conf:prob"))
+        put(f"Mixed{cap}OneFormat", diag_any(res, f, "main_ctx20_gate_conf:prob"))
+        vals = [v for v in (diag_any(res, f, n) for n in
+                            ["main_ctxv20_gate_conf:prob"] + [f"main_ctxv20_e{s}_gate_conf:prob" for s in range(1, 10)])
+                if v is not None]
+        if len(vals) >= 2:
+            import statistics
+            out[("track_c", "ExpertSeeds")] = str(len(vals))
+            put(f"Mixed{cap}VariedMean", statistics.mean(vals))
+            put(f"Mixed{cap}VariedSd", statistics.stdev(vals))
+            put(f"Mixed{cap}VariedMax", max(vals))
+    d = res.get("track_c/diag_mixed_main")
+    if d:
+        s = d["data"]["systems"]
+        put("OracleTokenSeeded", s["main_seeded_gate_conf/oracle_token"]["all"])
+    e = ev(res, "main_ctxv20_add_facts", "gate:main_ctxv20_gate_conf_add_replay_ctx:prob")
+    if e:
+        put("UpdOldRecall", e["facts_train_templates"]["all"])
+        put("UpdNewRecall", e["facts_new_train_templates"]["all"])
+    a = ev(res, "main_ctxv20", "gate:main_ctxv20_gate_atom:prob")
+    if a:
+        put("CircuitLambdaActive", a["routing"]["circuit_lambda_active"], fmt2)
+    return out
+
+
 def derived_macros(res):
     """Numbers computed from several fields; named like the stored macros."""
     out = {}
@@ -117,6 +293,7 @@ def derived_macros(res):
             if (op, n) in sc:
                 out[("track_a", word + "Tokens")] = f"{sc[(op, n)]['tokens']:,.0f}"
                 out[("track_a", word + "Seconds")] = f"{sc[(op, n)]['seconds']:.2f}"
+    out.update(track_c_macros(res))
     return out
 
 
@@ -138,6 +315,10 @@ def main():
             with open(os.path.join(PAPER, "tables", f"{name}.tex"), "w", encoding="utf-8") as f:
                 f.write(HEADER + build(res[key]))
             print(f"wrote paper/tables/{name}.tex")
+    for name, build in C_TABLES:
+        with open(os.path.join(PAPER, "tables", f"{name}.tex"), "w", encoding="utf-8") as f:
+            f.write(HEADER + build(res))
+        print(f"wrote paper/tables/{name}.tex")
 
 
 if __name__ == "__main__":

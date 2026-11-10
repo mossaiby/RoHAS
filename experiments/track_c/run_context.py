@@ -9,6 +9,8 @@ only. Then the confidence-only gate and the final atom gate (with the circuit), 
 standard evaluation (tag main_ctx<pct>), and the mixed-text decomposition (diag_mixed.py) on
 mixed_val and on the data_mixed_ood.py formats (tags <format>_main_ctx<pct>).
 --varied uses the ctxv_<type> files (formats varied; prefix main_ctxv<pct>).
+--seed s (s > 0) retrains the experts with another data order from the same seed model
+(prefix main_ctxv<pct>_e<s>); the gates keep seed 0, so the spread is expert variance.
 Requires: python experiments/track_c/data_context.py [--varied]; data_mixed_ood.py
 """
 import argparse
@@ -40,17 +42,19 @@ def main():
     ap.add_argument("--frac", type=float, default=0.2)
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--varied", action="store_true", help="ctxv_<type> data (data_context.py --varied)")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="expert seed (data order of the branches; the seed model is shared); prefix gets _e<seed>")
     a = ap.parse_args()
     steps = a.only or ["experts", "gates", "eval", "diag"]
     src = "ctxv" if a.varied else "ctx"
-    p = f"main_{src}{round(100 * a.frac)}"
+    p = f"main_{src}{round(100 * a.frac)}" + (f"_e{a.seed}" if a.seed else "")
     experts = [f"{p}_{t}" for t in TYPES]
     if "experts" in steps:
         for t in TYPES:
             if not have(f"{p}_{t}"):
                 run([os.path.join(HERE, "train.py"), "--name", f"{p}_{t}", "--init",
                      os.path.join(CKPT, "main_seeded_seed.pt"), "--mix", f"{t}={1 - a.frac}", f"{src}_{t}={a.frac}",
-                     "--own", t, "--tokens", "50e6", "--batch-tokens", "8192", "--lr", "1e-3"])
+                     "--own", t, "--tokens", "50e6", "--batch-tokens", "8192", "--lr", "1e-3", "--seed", str(a.seed)])
     if "gates" in steps:
         for g, extra, ex in [("conf", [], experts), ("atom", ["--atom", "--veto"], experts + ["circuit"])]:
             if not have(f"{p}_gate_{g}"):
