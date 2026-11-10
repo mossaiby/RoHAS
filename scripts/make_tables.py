@@ -203,6 +203,38 @@ def table_track_c_arith(res):
     return tabular("l" + "r" * 17, head, rows)
 
 
+TOOL_SYSTEMS = [("mono\\_s", ["model:main_mono_s"]),
+                ("mono\\_s + calculator", ["tool:main_mono_s_calc"]),
+                ("mono\\_s + calculator, closing marker", ["tool:main_mono_s_calc_end"]),
+                ("gate + circuit (worst of 3 expert seeds)",
+                 [f"gate:main_ctxv20{s}_gate_atom:prob" for s in ("", "_e1", "_e2")])]
+
+
+def tool_cells(res, specs):
+    """Held-out arithmetic and arithmetic-in-text accuracy (percent), the minimum over `specs`."""
+    h = res.get("track_c/tool_heldout", {}).get("data", {})
+    c = res.get("track_c/tool_context", {}).get("data", {})
+    if not all(s in h and s in c for s in specs):
+        return None
+    worst = lambda f: 100 * min(f(s) for s in specs)  # noqa: E731
+    num = lambda op, d: worst(lambda s: h[s]["arith_number"][op][d])  # noqa: E731
+    ctx = lambda k: worst(lambda s: c[s]["summary"][k])  # noqa: E731
+    return [num("+", "16"), num("+", "32"), num("-", "32"), num("*", "8"), worst(lambda s: h[s]["word"]),
+            ctx("kind=lang"), ctx("kind=facts"), ctx("kind=code"), ctx("join=blank"), ctx("join=inline"), ctx("all")]
+
+
+def table_track_c_tool(res):
+    rows = []
+    for label, specs in TOOL_SYSTEMS:
+        cells = tool_cells(res, specs)
+        if cells:
+            rows.append(f"{label} & " + " & ".join(f"{v:.0f}" for v in cells) + r" \\")
+    head = (r"& \multicolumn{5}{c}{Held-out arithmetic} & \multicolumn{6}{c}{Inside other text} \\"
+            "\n" r"\cmidrule(lr){2-6}\cmidrule(lr){7-12}" "\n"
+            r"System & $+$16 & $+$32 & $-$32 & $\times$8 & Word & Story & Bio. & Code & Blank & Inline & All")
+    return tabular("l" + "r" * 11, head, rows)
+
+
 def table_track_c_update(res):
     """After adding 500 people. Loss on stories and code, mixed loss in every format, recall."""
     systems = [
@@ -231,7 +263,8 @@ def table_track_c_update(res):
 
 
 C_TABLES = [("track_c_types", table_track_c_types), ("track_c_mixed", table_track_c_mixed),
-            ("track_c_arith", table_track_c_arith), ("track_c_update", table_track_c_update)]
+            ("track_c_arith", table_track_c_arith), ("track_c_update", table_track_c_update),
+            ("track_c_tool", table_track_c_tool)]
 
 
 def track_c_macros(res):
@@ -273,6 +306,13 @@ def track_c_macros(res):
     if e:
         put("UpdOldRecall", e["facts_train_templates"]["all"])
         put("UpdNewRecall", e["facts_new_train_templates"]["all"])
+    for key, specs in [("Tool", ["tool:main_mono_s_calc"]), ("ToolEnd", ["tool:main_mono_s_calc_end"]),
+                       ("ToolMonoS", ["model:main_mono_s"]), ("ToolGate", TOOL_SYSTEMS[-1][1])]:
+        cells = tool_cells(res, specs)
+        if cells:
+            for i, n in enumerate(["PlusSixteen", "PlusThirtyTwo", "MinusThirtyTwo", "TimesEight", "Word",
+                                   "CtxStory", "CtxBio", "CtxCode", "CtxBlank", "CtxInline", "CtxAll"]):
+                out[("track_c", f"{key}{n}")] = f"{cells[i]:.0f}"
     a = ev(res, "main_ctxv20", "gate:main_ctxv20_gate_atom:prob")
     if a:
         put("CircuitLambdaActive", a["routing"]["circuit_lambda_active"], fmt2)

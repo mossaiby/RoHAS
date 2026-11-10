@@ -408,3 +408,85 @@ Varied exposure, follow-up (`run_ctxv_followup.py`; `eval_main_ctxv20_{seeds,add
   - Not covered: the seed model and the baselines are single runs.
   - The run was paused by hibernation during the e2 atom-gate eval. Only losses and
     accuracies come from it, so no numbers are affected.
+
+### Track C calculator-tool baseline (`tool_baseline.py`; pre-registered 2026-11-10, before training)
+
+Question: is the circuit under the label-free gate better than, or just equal to, the
+standard alternative of a model trained to call a calculator (Toolformer-style)?
+
+- **Baseline (mono_s+calc):** main_mono_s fine-tuned on its own data mix with every
+  equation in the math and mixed data annotated as a call: `a op b=` then the call token
+  (byte 0x01, one BPE token, 4 occurrences in all training data, all in code), then the
+  answer. The answer tokens are tool output: masked from the loss, and inserted by the tool at
+  inference. The tool parses the equation right before the call with the same rule as the
+  circuit expert, so both systems get the same parser and differ only in how they decide to
+  use it: labels and fine-tuning versus the label-free gate. 50M tokens, lr 3e-4, 8k-token
+  batches; the same proportions as mono_s (lang, facts, math, code at 0.246 each, mixed
+  0.015). The fine-tune costs 50M tokens more than mono_s; the gate system is not retrained.
+- **Systems compared:** mono_s (no tool), mono_s+calc, and the atom gate main_ctxv20_gate_atom
+  with its two expert seeds (e1, e2).
+- **Tests:**
+  1. Held-out arithmetic (eval seed 1000, 100 items per cell, up to 32 digits) and word
+     problems.
+  2. Arithmetic inside other text (new): the bare equation follows a story, biography or
+     code segment, joined by a blank line (the training format of mixed documents) or by a
+     space (inline; held out for both systems). Exact-answer accuracy, 4- and 16-digit
+     operands, + − ×.
+  3. Cost to the other data: val losses on lang, facts and code, and mixed-text loss on
+     the four formats split by segment type. On math segments the baseline's loss is not
+     comparable (it expects the call token after "="), so it is reported apart.
+- **Predictions:**
+  - P1: mono_s+calc is exact (≥ 0.99) at every length on bare prompts and word problems.
+    If so, the circuit result is matched by a labelled tool, and the paper must say so.
+  - P2: mono_s+calc changes mono_s's lang, facts and code val losses by ≤ 0.02 nats.
+  - P3: the atom gate is ≥ 0.95 exact in every context of test 2.
+  - No prediction for mono_s+calc in test 2; that is the open question.
+- **How the paper uses it:** if the tool matches the gate everywhere, the claim narrows
+  to: no call labels, no retraining of any expert, and the system stays a calibrated
+  language model (it can score text). An advantage is claimed only where test 2 shows one.
+- **Results, pre-registered format (main_mono_s_calc; no closing marker):**
+  - Fine-tune: 50M tokens, about 19 min.
+  - **P1 fails.** Held-out arithmetic is exact up to 8 digits (+, −) and 3 digits (×). Then
+    + falls to 0.65 / 0.65 / 0.01 / 0.00 at 12 / 16 / 24 / 32 digits, − to 0.48 / 0.17 / 0 / 0,
+    and × to 0.98 / 0.29 / 0.28 at 4 / 6 / 8. Word problems 1.00. mono_s without a tool: 0 from
+    6 digits (+, −) and from 3 (×), word problems 0.82.
+  - Cause, checked on raw outputs: the tool always inserts the right answer, but on numbers
+    longer than in training the model keeps writing digits after it (the line-ending
+    failure that the circuit's veto prevents).
+  - **Test 2 (arithmetic inside other text):** mono_s+calc 0.425 overall (blank-line join 0.56,
+    inline 0.29; 4 digits 0.77, 16 digits 0.08). Besides the line ending, the model sometimes
+    never calls the tool after "=" (about 15% of items in a 144-item check). mono_s 0.114. The
+    atom gate is exact on every item, for all three expert seeds (**P3 holds**).
+  - The atom gate is exact on all held-out arithmetic and word problems for all three
+    expert seeds.
+  - **P2, literally, fails, in the good direction:** val losses lang 1.710 (mono_s 1.739),
+    facts 0.437 (0.438), code 2.113 (2.146). The extra 50M tokens help. Fact recall 0.841 /
+    0.073 (0.702 / 0.062).
+  - Mixed text by segment type (non-math segments): better than mono_s on long, inline and
+    marked; worse on the blank-line format (lang 2.54 vs 2.45, facts 1.12 vs 0.99). Math
+    segments are not comparable (plain equations, while the model expects the call token).
+- **Deviation from the pre-registration:** the pre-registered format lacks the closing
+  delimiter that Toolformer's format has ("-> result]"), which handicaps the baseline on
+  exactly the line ending. So we add a variant, main_mono_s_calc_end, where the tool also
+  inserts a closing marker (byte 0x02). Both are reported; the paper uses the stronger one.
+- **Results, closing-marker variant (main_mono_s_calc_end):**
+  - Held-out arithmetic is exact at every length up to 24 digits for + and −, and for × up to
+    8. At 32 digits: + 0.94, − 0.80. Word problems 1.00.
+  - Test 2: 0.703 overall. By context: facts 0.935, lang 0.81, code 0.365; blank-line join
+    0.874, inline 0.532; 4 digits 0.848, 16 digits 0.559. Code inline: 0.00–0.10.
+  - Every remaining failure, checked on raw outputs, is a missing call: after "=" the model
+    writes digits itself (7 of 40 32-digit subtractions; most code-context items). Once it
+    calls, answer and ending are always right.
+  - Val losses: lang 1.712, facts 0.439, code 2.115; fact recall 0.840 / 0.067. Mixed text
+    by segment type matches the first variant within 0.03.
+- **Conclusion for the paper:**
+  - On bare arithmetic, a labelled calculator matches the circuit up to 24 digits and then
+    falls short only because the model stops calling the tool on longer numbers than it was
+    trained on.
+  - Inside other text, the label-free gate is exact everywhere (3 expert seeds), while
+    the tool model is 0.70 and fails mostly after code and inline. Its trigger is learned
+    from where calls appear in training; the circuit's applicability is decided by the
+    circuit itself and the gate learns to trust it from confidence alone.
+  - Caveat: the circuit applies wherever its pattern appears, so an equation-like string in
+    code (where "=" may be assignment) would also trigger it. False triggers of this kind
+    have not been measured yet.

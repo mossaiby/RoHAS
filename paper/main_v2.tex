@@ -411,6 +411,42 @@ digits per operand (100 items per cell), and word problems.}
 {\footnotesize\setlength{\tabcolsep}{2.5pt}\IfFileExists{tables/track_c_arith.tex}{\input{tables/track_c_arith}}{\pending{table}}}
 \end{table}
 
+\paragraph{Against a calculator tool.} The circuit computes what a calculator computes, so the
+natural baseline is a model trained to call one, as in Toolformer~\citep{schick2023toolformer}.
+We fine-tune mono\_s on its own data mix (50M tokens) with every equation in the math and mixed
+data written as a call: \texttt{a op b=}, a call token, then the answer. The answer is tool
+output. It is left out of the loss, and at inference the tool computes it and inserts it. The
+tool reads the equation with the circuit's own rule, so the two systems share the parser and
+the arithmetic. They differ in how the system decides to use them: call labels and fine-tuning
+for the tool, the label-free gate over unchanged experts for the circuit. We fixed the tests
+and predictions before training. Our first format had no closing delimiter, and the model then
+kept writing digits after long inserted answers. We therefore also report a variant in which the
+tool inserts a closing marker after the answer, like Toolformer's ``$\rightarrow$
+result\,]''.
+
+Table~\ref{tab:scratch_tool} gives the results. With the closing marker, the tool baseline
+is exact on held-out arithmetic up to 24 digits. At 32 digits it reaches
+\resTrackCToolEndPlusThirtyTwo\% ($+$) and \resTrackCToolEndMinusThirtyTwo\% ($-$), because the
+model sometimes stops calling the tool on numbers longer than any in training. The difference
+is larger when the arithmetic appears inside other text, after a story, a biography or a code
+segment, joined by a blank line or inline. In training, equations follow other text only in
+the mixed documents, joined by blank lines; the inline join is new to every system. The tool model is exact on \resTrackCToolEndCtxAll\% of these items, and on
+\resTrackCToolEndCtxCode\% after code. On raw outputs, every remaining failure is a missing call:
+after ``='' the model writes digits itself. The gated system with the circuit is exact on every
+item, for each of three expert seeds. The tool's trigger is learned from where calls appear
+in its training data. The circuit decides for itself where it applies, and the gate learns from
+confidence alone when to trust it. The circuit's rule fires wherever an equation appears,
+including code where ``='' may be assignment; we have not measured false triggers of that kind.
+\begin{table}[t]
+\centering\small
+\caption{A calculator tool versus the circuit under the gate: percentage of exact answers.
+Held-out arithmetic by operator and digits per operand (100 items per cell) and word problems;
+arithmetic inside other text (+, $-$, $\times$ at 4 and 16 digits, 600 items per context type,
+900 per join). The tool models are mono\_s fine-tuned with call labels.}
+\label{tab:scratch_tool}
+{\footnotesize\setlength{\tabcolsep}{2.5pt}\IfFileExists{tables/track_c_tool.tex}{\input{tables/track_c_tool}}{\pending{table}}}
+\end{table}
+
 \subsection{Adding facts after training}
 \label{sec:scratch_update}
 

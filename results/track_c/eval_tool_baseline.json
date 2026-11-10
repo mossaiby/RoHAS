@@ -1,0 +1,112 @@
+{
+ "meta": {
+  "git_commit": "6333cc8961766152fac83684a361e44168b32a8a",
+  "git_dirty": true,
+  "timestamp": "2026-11-10T23:53:08",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 155.31
+ },
+ "data": {
+  "systems": {
+   "model:main_mono_s_calc": {
+    "loss": {
+     "lang": 1.7098785042762756,
+     "facts": 0.43653479516506194,
+     "math": 1.583101463317871,
+     "code": 2.1132567316293716,
+     "mixed": 2.1746370881795882
+    },
+    "facts_heldout": {
+     "birth_year": 0.08,
+     "birth_city": 0.043333333333333335,
+     "university": 0.03166666666666667,
+     "major": 0.06166666666666667,
+     "employer": 0.025,
+     "work_city": 0.195,
+     "all": 0.07277777777777777
+    },
+    "facts_train_templates": {
+     "birth_year": 0.5266666666666666,
+     "birth_city": 0.8766666666666667,
+     "university": 0.9233333333333333,
+     "major": 0.8833333333333333,
+     "employer": 0.9,
+     "work_city": 0.9366666666666666,
+     "all": 0.8411111111111111
+    },
+    "facts_new_heldout": {
+     "birth_year": 0.015,
+     "birth_city": 0.01,
+     "university": 0.025,
+     "major": 0.028333333333333332,
+     "employer": 0.02,
+     "work_city": 0.02,
+     "all": 0.01972222222222222
+    },
+    "facts_new_train_templates": {
+     "birth_year": 0.013333333333333334,
+     "birth_city": 0.0033333333333333335,
+     "university": 0.02666666666666667,
+     "major": 0.03666666666666667,
+     "employer": 0.02666666666666667,
+     "work_city": 0.03333333333333333,
+     "all": 0.023333333333333334
+    }
+   },
+   "model:main_mono_s_calc_end": {
+    "loss": {
+     "lang": 1.7118140310049057,
+     "facts": 0.43871758654713633,
+     "math": 1.395650601387024,
+     "code": 2.115388122200966,
+     "mixed": 2.157874810695648
+    },
+    "facts_heldout": {
+     "birth_year": 0.08166666666666667,
+     "birth_city": 0.04666666666666667,
+     "university": 0.04,
+     "major": 0.043333333333333335,
+     "employer": 0.021666666666666667,
+     "work_city": 0.17,
+     "all": 0.06722222222222222
+    },
+    "facts_train_templates": {
+     "birth_year": 0.51,
+     "birth_city": 0.8933333333333333,
+     "university": 0.92,
+     "major": 0.8666666666666667,
+     "employer": 0.91,
+     "work_city": 0.94,
+     "all": 0.84
+    },
+    "facts_new_heldout": {
+     "birth_year": 0.013333333333333334,
+     "birth_city": 0.013333333333333334,
+     "university": 0.025,
+     "major": 0.018333333333333333,
+     "employer": 0.021666666666666667,
+     "work_city": 0.021666666666666667,
+     "all": 0.01888888888888889
+    },
+    "facts_new_train_templates": {
+     "birth_year": 0.01,
+     "birth_city": 0.01,
+     "university": 0.02666666666666667,
+     "major": 0.03666666666666667,
+     "employer": 0.016666666666666666,
+     "work_city": 0.02,
+     "all": 0.02
+    }
+   }
+  }
+ },
+ "macros": {}
+}
