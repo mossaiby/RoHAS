@@ -328,10 +328,51 @@ def track_c_macros(res):
         for k, v in ft["stress"]["nats_per_item"].items():
             for kind, x in v.items():
                 put(f"Stress{cap[k]}{kind.capitalize()}", x, lambda z: f"{z:.1f}")
+    # line ending: answer exact AND followed by a newline, + and - at 12 digits and more, 3 atom-gate seeds
+    lm = [ev(res, "main_ctxv20_heldout", f"gate:main_ctxv20_gate_atom{s}:prob") for s in ("", "_s1", "_s2")]
+    if all(lm):
+        v = [e["arith"][op][d] for e in lm for op in "+-" for d in ("12", "16", "24", "32")]
+        put("LineMatchMin", 100 * min(v), lambda z: f"{z:.0f}")
+        put("LineMatchMax", 100 * max(v), lambda z: f"{z:.0f}")
     a = ev(res, "main_ctxv20", "gate:main_ctxv20_gate_atom:prob")
     if a:
         put("CircuitLambdaActive", a["routing"]["circuit_lambda_active"], fmt2)
     return out
+
+
+ABLATIONS = [  # (label, eval tag, system) -- seeded experts, development items (eval seed 0)
+    ("no circuit, probability mixture", "main", "gate:main_seeded_gate_prob:prob"),
+    ("no circuit, logit mixture", "main", "gate:main_seeded_gate_logit:logit"),
+    ("no circuit, hard routing", "main", "gate:main_seeded_gate_prob:hard"),
+    ("circuit, one gate on hidden states", "main_circuit", "gate:main_seeded_gate_circ:prob"),
+    ("circuit, own head on all confidences", "main_circuit", "gate:main_seeded_gate_split:prob"),
+    ("two-level, MLP atom head", "main_circuit", "gate:main_seeded_gate_atom_mlp:prob"),
+    ("two-level, linear head, units of $\\log V$", "main_circuit_atom_lin", "gate:main_seeded_gate_atom_lin:prob"),
+    ("two-level, linear head, nats (final)", "main_circuit_atom", "gate:main_seeded_gate_atom:prob"),
+    ("\\quad final, vetoes off", "main_circuit_atom", "gate:main_seeded_gate_atom:prob_noveto"),
+    ("\\quad final, hard routing", "main_circuit_atom", "gate:main_seeded_gate_atom:hard"),
+]
+
+
+def table_track_c_ablation(res):
+    rows = []
+    for label, tag, spec in ABLATIONS:
+        e = ev(res, tag, spec)
+        if not e:
+            continue
+        a = e.get("arith_number")
+        r = e.get("routing", {})
+        lam = r.get("circuit_lambda_active")
+        if not a and spec.endswith(":hard"):            # hard routing without a circuit: loss only
+            a = None
+        cells = [fmt3(e["loss"]["mixed"])]
+        cells += ([f"{100 * a['+'][d]:.0f}" for d in ("8", "16", "32")] + [f"{100 * a['*'][d]:.0f}" for d in ("4", "8")] +
+                  [f"{100 * e['word']:.0f}"]) if a else ["--"] * 6
+        cells.append("--" if lam is None else f"{lam:.2f}")
+        rows.append(f"{label} & " + " & ".join(cells) + r" \\")
+    head = (r"& & \multicolumn{3}{c}{$+$} & \multicolumn{2}{c}{$\times$} & & \\" "\n"
+            r"System & Mixed & 8 & 16 & 32 & 4 & 8 & Word & $\lambda_{\mathrm{circ}}$")
+    return tabular("l" + "r" * 8, head, rows)
 
 
 # ---- track B ------------------------------------------------------------------------
@@ -450,7 +491,8 @@ def track_b_macros(res):
     return out
 
 
-B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2)]
+B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2),
+            ("track_c_ablation", table_track_c_ablation)]
 
 
 def derived_macros(res):
