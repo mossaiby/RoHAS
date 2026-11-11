@@ -80,7 +80,8 @@ def table_track_a_scaling(r):
 
 def table_track_a_length(r):
     data = r["data"]
-    names = {"compiled": "compiled", "python": "Python", "qwen0.5b": "Qwen2.5-0.5B", "qwen1.5b": "Qwen2.5-1.5B"}
+    names = {"compiled": "compiled", "python": "Python", "qwen0.5b": "Qwen2.5-0.5B-Instruct",
+             "qwen1.5b": "Qwen2.5-1.5B-Instruct"}
     lines = []
     for op in data["ops"]:
         for i, s in enumerate(data["systems"]):
@@ -125,7 +126,9 @@ def fmt2(v):
 # (label, eval tag, eval system, unused, diag system)
 C_SYSTEMS = [
     ("mono\\_s", "main", "model:main_mono_s", "main", "main_mono_s"),
+    ("\\quad second seed", "main_r1", "model:main_mono_s_r1", None, "main_mono_s_r1"),
     ("mono\\_m", "main", "model:main_mono_m", "main", "main_mono_m"),
+    ("\\quad second seed", "main_r1", "model:main_mono_m_r1", None, "main_mono_m_r1"),
     ("independent experts", "main_circuit_seeds", "gate:main_gate_conf:prob", "main", "main_gate_conf:prob"),
     ("seeded experts", "main_circuit", "gate:main_seeded_gate_conf:prob", "main", "main_seeded_gate_conf:prob"),
     ("+ exposure, one format", "main_ctx20", "gate:main_ctx20_gate_conf:prob", None, "main_ctx20_gate_conf:prob"),
@@ -175,7 +178,9 @@ def seed_rows(res, prefix, label):
 def table_track_c_mixed(res):
     rows = []
     for label, _, _, _, dsys in C_SYSTEMS:
-        rows.append(f"{label} & " + " & ".join(fmt3(diag_any(res, f, dsys)) for f, _ in FORMATS) + r" \\")
+        vals = [diag_any(res, f, dsys) for f, _ in FORMATS]
+        if any(v is not None for v in vals):
+            rows.append(f"{label} & " + " & ".join(fmt3(v) for v in vals) + r" \\")
     s = seed_rows(res, "main_ctxv20", r"\quad mean $\pm$ sd, {n} expert seeds")
     if s:
         rows.append(s)
@@ -186,6 +191,7 @@ def table_track_c_mixed(res):
 def table_track_c_arith(res):
     plus, times = ["1", "2", "4", "8", "16", "32"], ["1", "2", "4", "8"]
     systems = [("mono\\_s", "main_heldout", "model:main_mono_s"),
+               ("\\quad second seed", "main_r1_heldout", "model:main_mono_s_r1"),
                ("seeded experts, no circuit", "main_heldout", "gate:main_seeded_gate_conf:prob"),
                ("varied exposure, no circuit", "main_ctxv20_heldout", "gate:main_ctxv20_gate_conf:prob"),
                ("varied exposure + circuit", "main_ctxv20_heldout", "gate:main_ctxv20_gate_atom:prob")]
@@ -283,9 +289,24 @@ def track_c_macros(res):
         out[("track_c", "SeedTokens")] = f"{tr('main_seeded_seed')['tokens'] / 1e6:.0f}M"
         out[("track_c", "GateParams")] = f"{tr('main_ctxv20_gate_atom')['gate_params'] / 1e3:.0f}k"
         out[("track_c", "GateFlopsPct")] = f"{100 * tr('main_ctxv20_gate_atom')['flops'] / tr('main_mono_s')['flops']:.0f}"
+    gaps = [abs(diag_any(res, f, m) - diag_any(res, f, m + "_r1")) for f, _ in FORMATS
+            for m in ("main_mono_s", "main_mono_m") if diag_any(res, f, m + "_r1") is not None]
+    if gaps:
+        put("MonoSeedGapMax", max(gaps))
+        best = lambda f: min(diag_any(res, f, m + r) for m in ("main_mono_s", "main_mono_m") for r in ("", "_r1"))  # noqa: E731
+        worst = lambda f: max(v for v in (diag_any(res, f, n) for n in  # noqa: E731
+                                          ["main_ctxv20_gate_conf:prob"] + [f"main_ctxv20_e{s}_gate_conf:prob" for s in range(1, 10)])
+                              if v is not None)
+        put("MixedWorstMarginMin", min(best(f) - worst(f) for f, _ in FORMATS))
     for f, _ in FORMATS:
         cap = f.capitalize()
         put(f"Mixed{cap}MonoS", diag_any(res, f, "main_mono_s"))
+        put(f"Mixed{cap}MonoSRone", diag_any(res, f, "main_mono_s_r1"))
+        put(f"Mixed{cap}MonoMRone", diag_any(res, f, "main_mono_m_r1"))
+        both = [v for v in (diag_any(res, f, n) for n in ("main_mono_s", "main_mono_s_r1", "main_mono_m",
+                                                          "main_mono_m_r1")) if v is not None]
+        if len(both) == 4:
+            put(f"Mixed{cap}MonoBest", min(both))
         put(f"Mixed{cap}Seeded", diag_any(res, f, "main_seeded_gate_conf:prob"))
         put(f"Mixed{cap}Varied", diag_any(res, f, "main_ctxv20_gate_conf:prob"))
         put(f"Mixed{cap}OneFormat", diag_any(res, f, "main_ctx20_gate_conf:prob"))
@@ -337,6 +358,28 @@ def track_c_macros(res):
     a = ev(res, "main_ctxv20", "gate:main_ctxv20_gate_atom:prob")
     if a:
         put("CircuitLambdaActive", a["routing"]["circuit_lambda_active"], fmt2)
+    # the circuit's weight where active, over the three gate seeds (experts fixed)
+    for key, tags in (("CircuitLambda", [("main_ctxv20", "main_ctxv20_gate_atom"),
+                                         ("main_ctxv20_seeds", "main_ctxv20_gate_atom_s1"),
+                                         ("main_ctxv20_seeds", "main_ctxv20_gate_atom_s2")]),
+                      ("SeededLambda", [("main_circuit_atom", "main_seeded_gate_atom"),
+                                        ("main_circuit_seeds", "main_seeded_gate_atom_s1"),
+                                        ("main_circuit_seeds", "main_seeded_gate_atom_s2")])):
+        es = [ev(res, t, f"gate:{g}:prob") for t, g in tags]
+        if all(es):
+            lam = [e["routing"]["circuit_lambda_active"] for e in es]
+            put(f"{key}Min", min(lam), fmt2)
+            put(f"{key}Max", max(lam), fmt2)
+    # math loss of the monolithic models before and after the fact update (it does not move)
+    for size, cap in (("s", "S"), ("m", "M")):
+        b, u = ev(res, "main", f"model:main_mono_{size}"), ev(res, "main_add_facts", f"model:main_add_replay_all_mono_{size}")
+        if b and u:
+            put(f"UpdMono{cap}MathBefore", b["loss"]["math"])
+            put(f"UpdMono{cap}MathAfter", u["loss"]["math"])
+    if tr("main_mono_m"):
+        mm = tr("main_mono_m")
+        out[("track_c", "MonoMMixedPct")] = f"{100 * mm['mix']['mixed']:.1f}"
+        out[("track_c", "MonoMixedTokens")] = f"{mm['mix']['mixed'] * mm['tokens'] / 1e6:.0f}M"
     return out
 
 
@@ -491,7 +534,65 @@ def track_b_macros(res):
     return out
 
 
+B_CIRC_SYS = [("base", "Base"), ("coder", "Coder"), ("gate", "Gate"), ("gate_circuit", "Gate + circuit")]
+
+
+def table_track_b_circuit(res):
+    """Exact-match accuracy of live greedy generation (step 3), equations and in-text."""
+    r = res.get("track_b/circuit_gate", {}).get("data", {})
+    if "gen" not in r:
+        return "% no results\n"
+    g = r["gen"]
+    sym = {"+": "$+$", "-": "$-$", "*": r"$\times$"}
+    rows = []
+    for cell in g["gate_circuit"]["equations"]:
+        op, n = cell.split("/")
+        rows.append(f"{sym[op]}, {n} digit{'' if n == '1' else 's'} & " + " & ".join(fmt2(g[s]["equations"][cell]) for s, _ in B_CIRC_SYS) + r" \\")
+    rows.append(r"\midrule")
+    for ctx in ("prose", "code"):
+        for join in ("blank", "inline"):
+            vals = []
+            for s, _ in B_CIRC_SYS:
+                c = [v for k, v in g[s]["in_text"].items() if k.startswith(f"{ctx}/{join}/")]
+                vals.append(sum(c) / len(c))
+            rows.append(f"After {ctx}, {'new line' if join == 'blank' else 'same line'} & "
+                        + " & ".join(fmt2(v) for v in vals) + r" \\")
+    head = "Item & " + " & ".join(lab for _, lab in B_CIRC_SYS)
+    return tabular("l" + "r" * len(B_CIRC_SYS), head, rows)
+
+
+def track_b_circuit_macros(res):
+    r = res.get("track_b/circuit_gate", {}).get("data", {})
+    out = {}
+    if not r:
+        return out
+
+    def put(name, v, f=fmt3):
+        out[("track_b", name)] = f(v)
+    h, L = r["head"], r["loss"]
+    put("CircLamOn", h["lambda_active"], lambda z: f"{z:.4f}")
+    put("CircLamOff", h["lambda_inactive"], lambda z: f"{z:.4f}")
+    for f, key in (("prose_val", "Prose"), ("code_val", "Code"), ("notebooks_val", "Notebook")):
+        put(f"CircCost{key}", L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"], lambda z: f"{z:.4f}")
+    put("CircCostMax", max(L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"]
+                           for f in ("prose_val", "code_val", "notebooks_val")), lambda z: f"{z:.4f}")
+    for f, key in (("a4_blank_val", "Blank"), ("a4_inline_val", "Inline")):
+        put(f"CircActGate{key}", L[f]["loss_active"]["gate"])
+        put(f"CircActCirc{key}", L[f]["loss_active"]["gate_circuit"], lambda z: f"{z:.4f}")
+        put(f"CircGain{key}", L[f]["loss"]["gate"] - L[f]["loss"]["gate_circuit"])
+        put(f"CircActive{key}", L[f]["active_tokens"], lambda z: f"{z:,}")
+    if "gen" in r:
+        g = r["gen"]
+        for s, key in (("base", "Base"), ("coder", "Coder"), ("gate", "Gate"), ("gate_circuit", "GateCirc")):
+            put(f"CircInText{key}", g[s]["in_text_all"], fmt2)
+        put("CircInTextGatePct", 100 * g["gate"]["in_text_all"], lambda z: f"{z:.0f}")
+        put("CircEqMin", min(g["gate_circuit"]["equations"].values()), fmt2)
+        put("CircInTextMin", min(g["gate_circuit"]["in_text"].values()), fmt2)
+    return out
+
+
 B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2),
+            ("track_b_circuit", table_track_b_circuit),
             ("track_c_ablation", table_track_c_ablation)]
 
 
@@ -511,6 +612,7 @@ def derived_macros(res):
                 out[("track_a", word + "Seconds")] = f"{sc[(op, n)]['seconds']:.2f}"
     out.update(track_c_macros(res))
     out.update(track_b_macros(res))
+    out.update(track_b_circuit_macros(res))
     return out
 
 

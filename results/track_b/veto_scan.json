@@ -1,0 +1,82 @@
+{
+ "meta": {
+  "git_commit": "6bd1d76b672fe4e20f90820068ef25b4eaf15be4",
+  "git_dirty": true,
+  "timestamp": "2026-11-12T00:18:06",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1"
+ },
+ "data": {
+  "prose_val": {
+   "tokens": 304128,
+   "counts": {
+    "none": 303501,
+    "true_pred": 0,
+    "false_pred": 0,
+    "true_veto": 627,
+    "false_veto": 0
+   },
+   "false_examples": []
+  },
+  "code_val": {
+   "tokens": 302592,
+   "counts": {
+    "none": 302473,
+    "true_pred": 0,
+    "false_pred": 0,
+    "true_veto": 119,
+    "false_veto": 0
+   },
+   "false_examples": []
+  },
+  "notebooks_val": {
+   "tokens": 301056,
+   "counts": {
+    "none": 300742,
+    "true_pred": 0,
+    "false_pred": 0,
+    "true_veto": 314,
+    "false_veto": 0
+   },
+   "false_examples": []
+  },
+  "a4_blank_val": {
+   "tokens": 199680,
+   "counts": {
+    "none": 186856,
+    "true_pred": 6254,
+    "false_pred": 0,
+    "true_veto": 6569,
+    "false_veto": 1
+   },
+   "false_examples": [
+    " and totaled for a nutritional risk score:\n- 3-5=moderate"
+   ]
+  },
+  "a4_inline_val": {
+   "tokens": 200192,
+   "counts": {
+    "none": 176478,
+    "true_pred": 11777,
+    "false_pred": 0,
+    "true_veto": 11937,
+    "false_veto": 0
+   },
+   "false_examples": []
+  }
+ },
+ "macros": {
+  "VetoScanTokens": "0.9M",
+  "VetoScanRespected": "1{,}060",
+  "VetoScanViolated": "0",
+  "VetoMixedViolated": "1",
+  "VetoMixedFalsePred": "0"
+ }
+}

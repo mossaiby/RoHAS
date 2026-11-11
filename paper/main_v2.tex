@@ -43,8 +43,8 @@ matched compute, experts that are exposed to foreign context in varied formats, 
 gate, beat a monolithic model on mixed text in every format we test, including two held out from
 all training (\resTrackCMixedInlineVaried{} vs.\ \resTrackCMixedInlineMonoS{} and
 \resTrackCMixedMarkedVaried{} vs.\ \resTrackCMixedMarkedMonoS{} nats per token). New facts are
-added by updating one expert, with the gate unchanged and no change elsewhere, while the
-monolithic model loses on every other data type. A compiled arithmetic expert under the same
+added by updating one expert, with the gate and the other experts unchanged, while the
+monolithic model gets worse on stories, code and mixed text and forgets old facts. A compiled arithmetic expert under the same
 gate gives exact answers to 32 digits on held-out problems, also when the arithmetic appears
 inside other text, where a model fine-tuned to call a calculator is exact on
 \resTrackCToolEndCtxAll\% of items. Over frozen pretrained experts that share a
@@ -52,7 +52,11 @@ tokenizer (prose, code and math models of 0.5B--1.5B parameters), the same gate 
 best single expert and also the best fixed mixture of the experts on mixed text, by
 \resTrackBCleanMarginMin--\resTrackBCleanMarginMax{} nats per token, although most of the gain
 over a single expert comes from ensembling, and only when the gate's training data is new to
-every expert. The compiled arithmetic experts, and an expression-parser expert that calls
+every expert. Added to the frozen prose-and-code gate with three new parameters, the compiled
+arithmetic expert makes the pretrained system exact on held-out equations up to 32 digits and
+inside prose and code, where the gate over the pretrained models alone is exact on
+\resTrackBCircInTextGatePct\% of items, at a cost of at most \resTrackBCircCostMax{} nats per
+token elsewhere. The compiled arithmetic experts, and an expression-parser expert that calls
 them, are exact on \resTrackACorrectnessCases{} test cases with \resTrackACorrectnessErrors{}
 errors, at operand lengths where prompted models of up to 1.5B parameters fail.
 \end{abstract}
@@ -97,13 +101,14 @@ two-level form in which an exact expert's weight depends only on its own confide
 (Section~\ref{sec:method}).
 (ii) Compiled experts for exact decimal $+,-,\times,\div$ of any length and an expression-parser
 expert that calls them; no weight depends on operand length (Section~\ref{sec:compiled}).
-(iii) A controlled from-scratch study: experts beat compute-matched monolithic models on their
-own data types, on fact recall and, once exposed to foreign context in varied formats, on mixed
+(iii) A controlled from-scratch study: experts beat compute-matched monolithic models on stories
+and code, on fact recall and, once exposed to foreign context in varied formats, on mixed
 text in held-out formats; facts are added by updating one expert; a compiled expert under the
 gate is exact where a calculator-calling model is not (Section~\ref{sec:scratch}).
 (iv) Pretrained experts under the same gate, separating routing from ensembling, and a failure
 mode of label-free gating: an expert that has memorised the gate's training data is trusted
-where it does not help (Section~\ref{sec:pretrained}).
+where it does not help; and a compiled expert added to the frozen gate over pretrained
+models, which makes their arithmetic exact (Section~\ref{sec:pretrained}).
 (v) Ablations of the gate design (Section~\ref{sec:ablations}).
 
 % =====================================================================================
@@ -116,7 +121,7 @@ DEMix~\citep{gururangan2022demix} uses domain-specific feed-forward layers; Bran
 (BTX)~\citep{sukhbaatar2024btx} trains math, code, and knowledge experts from a common seed and
 merges them into a mixture-of-experts model. These works split data by \emph{domain} under one
 training regime. We split by \emph{data type} with a different regime per type, admit experts
-that are not trained at all, and add an abstention outcome. BTX is the closest baseline for H1.
+that are not trained at all, and add an abstention outcome. BTX is the closest prior system for H1; we do not reimplement it.
 
 \paragraph{Token-level collaboration between models.} Co-LLM~\citep{shen2024colm} learns, per
 token, whether a base model defers to an expert; DExperts~\citep{liu2021dexperts} and
@@ -204,9 +209,9 @@ gives a next-token distribution $p_e$, its hidden state $h_e$ and confidence fea
 positions. A compiled expert gives its answer token, or the uniform null atom $u$ where it does
 not apply, and may veto tokens. The gate has two levels: the compiled expert's weight
 $\lambda_{\mathrm{circ}}$ comes from its own confidence alone, and the LM experts share the rest.
-Only the gate is trained, by maximising the likelihood of the mixture on mixed documents. With
-LM experts only (Sections~\ref{sec:scratch_types}--\ref{sec:pretrained}) the lower branch is
-absent and $\lambda_{\mathrm{circ}}=0$.}
+Only the gate is trained, by maximising the likelihood of the mixture on mixed documents. In
+the experiments with LM experts only, the lower branch is absent and
+$\lambda_{\mathrm{circ}}=0$.}
 \label{fig:gate}
 \end{figure}
 \paragraph{Experts.} All experts share one vocabulary $V$. Given a context $x$, expert $e$ gives
@@ -352,7 +357,8 @@ integers, \texttt{Decimal}, or the reference expression evaluator.}
 
 \paragraph{Length generalisation.} Table~\ref{tab:length} compares exact-match accuracy against
 operand length for the compiled experts, prompted Qwen2.5-Instruct models with 0.5B and 1.5B
-parameters, and a Python tool. Trained models of our own, with and without the compiled expert,
+parameters (the chat versions, not the base models of Section~\ref{sec:pretrained}), and a
+Python tool. Trained models of our own, with and without the compiled expert,
 are compared in Section~\ref{sec:scratch_circuit} (Table~\ref{tab:scratch_arith}).
 \begin{table}[t]
 \centering\small
@@ -406,10 +412,11 @@ total compute.
 
 \paragraph{Data.} Four data types share one byte-level BPE tokenizer with 8{,}192 tokens, in
 which every digit is a single token. \emph{Stories} are TinyStories~\citep{eldan2023tinystories}.
-\emph{Biographies} are synthetic: 2{,}000 fictitious people with six attributes each (birth
+\emph{Biographies} are synthetic, after the design of~\citet{allenzhu2024physics}: 2{,}000 fictitious people with six attributes each (birth
 year and city, university, major, employer, work city), written as 20 biographies per person
 from training templates; recall is tested with training templates and with held-out templates
-the model never saw. \emph{Math} is synthetic arithmetic (operands of up to 5 digits for $+$ and $-$,
+the model never saw: a fact counts as recalled when the model gives its true value a higher
+probability than every other value of that attribute. \emph{Math} is synthetic arithmetic (operands of up to 5 digits for $+$ and $-$,
 3 digits for $\times$) and templated word problems. \emph{Code} is Python from
 CodeParrot~\citep{codeparrot}, deduplicated and split by repository. \emph{Mixed} documents
 join 3--5 short segments of at least two types with blank lines, with a label per token that is
@@ -422,7 +429,8 @@ $\resTrackCFlops$ training FLOPs. We compare four systems at this budget.
 \item \textbf{mono\_s}: one model of expert size, trained on \resTrackCMonoSTokens{} tokens of all
 four types plus 1.5\% mixed documents.
 \item \textbf{mono\_m}: a model four times larger (\resTrackCParamsM{}) on \resTrackCMonoMTokens{}
-tokens of the same mixture.
+tokens: the four types in equal shares and the same \resTrackCMonoMixedTokens{} tokens of mixed
+documents, which are \resTrackCMonoMMixedPct\% of its data.
 \item \textbf{Independent experts}: four experts, each trained from scratch on 100M tokens of its
 own type only.
 \item \textbf{Seeded experts}: a shared seed model trained on \resTrackCSeedTokens{} tokens of
@@ -441,13 +449,15 @@ training adds \resTrackCGateFlopsPct\% to the budget.
 
 Table~\ref{tab:scratch_types} gives the loss on held-out data of each type and fact recall. The
 experts are better than both monolithic models on stories and code. They also recall far more
-facts, with training templates and, by a factor of about four, with held-out templates. The
+facts, with training templates and, by a factor of four or more, with held-out templates. The
 monolithic models are better on biography loss and, narrowly, on math. mono\_m is undertrained at this budget and is worse than mono\_s on every
-type. Section~\ref{sec:scratch_context} explains the last two rows.
+type. Both monolithic models were trained a second time with another seed (initialisation and
+data order); the losses of the two seeds agree closely, while mono\_s's recall with training
+templates varies more. Section~\ref{sec:scratch_context} explains the last two rows.
 \begin{table}[t]
 \centering\small
-\caption{Loss on held-out data of each type, and fact recall (fraction of attributes answered
-exactly) with the biography templates used in training and with held-out templates. Gated
+\caption{Loss on held-out data of each type, and fact recall (fraction of attributes whose true
+value is ranked first among all values of the attribute) with the biography templates used in training and with held-out templates. Gated
 systems use probability mixing; all systems have the same training compute.}
 \label{tab:scratch_types}
 \IfFileExists{tables/track_c_types.tex}{\input{tables/track_c_types}}{\pending{table}}
@@ -466,10 +476,10 @@ segment and well into it, because each one only ever saw windows of its own type
 \paragraph{Context exposure.} We therefore give each expert a fraction $f=0.2$ of its branch
 tokens as mixed documents in which each segment is the expert's own type with probability
 $1/2$, and compute the loss only on its own type's tokens. The expert learns to read foreign
-context but is never trained to predict it, and the compute is unchanged. Foreign segments come
-from material that no expert stores. They are biographies of a separate set of fictitious people,
-stories from a TinyStories shard that no expert trains on, and freshly generated math, so that
-facts remain in the facts expert alone. We check this: after exposure, the other experts recall
+context but is never trained to predict it, and the compute is unchanged. Foreign biographies,
+stories and math come from material that no expert stores: a separate set of fictitious people,
+a TinyStories shard that no expert trains on, and freshly generated math, so that
+facts remain in the facts expert alone. Foreign code comes from the code expert's training files. We check this: after exposure, the other experts recall
 stored facts at chance level.
 
 \paragraph{Format matters.} Exposure with documents built like the validation set lowers its loss
@@ -493,7 +503,10 @@ gates are retrained, with their seed fixed) changes these losses very little: th
 deviation is at most \resTrackCMixedMarkedVariedSd{} nats on any format
 (Table~\ref{tab:scratch_mixed}, last row). Even the worst seed (\resTrackCMixedInlineVariedMax{}
 inline, \resTrackCMixedMarkedVariedMax{} marked) beats every other system in the table on these
-held-out formats.
+held-out formats. The monolithic baselines, retrained with a second seed, move by at most
+\resTrackCMonoSeedGapMax{} nats on any format. On every format the worst expert seed is still
+better than the best of the four monolithic runs, by at least \resTrackCMixedWorstMarginMin{}
+nats.
 \begin{table}[t]
 \centering\small
 \caption{Loss on mixed text (nats per token) in four formats. Only the first (blank lines) is
@@ -506,8 +519,10 @@ held out from all training, including the varied exposure.}
 \subsection{A compiled expert under the learned gate}
 \label{sec:scratch_circuit}
 
-The compiled circuits of Section~\ref{sec:compiled} join the gate as a fifth expert. The circuit
-expert reads token identities only. When the context ends in an equation \texttt{a op b =}
+The compiled circuits of Section~\ref{sec:compiled} join the gate as a fifth expert. Under the
+gate we use addition, subtraction and multiplication of non-negative integers; division,
+decimals and the expression parser are tested only on their own (Section~\ref{sec:compiled}).
+The circuit expert reads token identities only. When the context ends in an equation \texttt{a op b =}
 followed by a prefix of its own answer, it predicts the next answer token with probability
 $1-10^{-4}$. Elsewhere it abstains with the uniform distribution, the null atom. It also emits
 two vetoes (anti-atoms): the wrong-sign variant of ``='' while $b$ is being written, and any
@@ -519,7 +534,11 @@ lengths seen in training. We therefore make the gate two-level. The circuit's we
 on its own two confidence features, measured in nats, through a linear head. The language-model
 experts share the remaining weight, split by the hidden-state gate as before. With this design
 the gate puts weight \resTrackCCircuitLambdaActive{} on the circuit where it is active and
-essentially zero elsewhere. Again no routing labels are used.
+essentially zero elsewhere. Again no routing labels are used. The weight varies with the gate's
+seed: over three seeds it is \resTrackCCircuitLambdaMin--\resTrackCCircuitLambdaMax{}. The
+lowest value is only just above the one half that the remark of Section~\ref{sec:method}
+requires, so that seed is exact but fragile; the head is trained for a fixed number of steps
+together with the gate and has not converged there.
 
 Table~\ref{tab:scratch_arith} gives exact-answer accuracy on items not used during development.
 Every trained system, including mono\_s, fails from 8 digits ($+$, $-$) or 4 digits ($\times$).
@@ -543,7 +562,8 @@ natural baseline is a model trained to call one, as in Toolformer~\citep{schick2
 We fine-tune mono\_s on its own data mix (50M tokens) with every equation in the math and mixed
 data written as a call: \texttt{a op b=}, a call token, then the answer. The answer is tool
 output. It is left out of the loss, and at inference the tool computes it and inserts it. The
-tool reads the equation with the circuit's own rule, so the two systems share the parser and
+tool reads the equation before the call with the circuit's rule (the call must follow ``='';
+the sign is part of the tool's output), so the two systems share the parser and
 the arithmetic. They differ in how the system decides to use them: call labels and fine-tuning
 for the tool, the label-free gate over unchanged experts for the circuit. We fixed the tests
 and predictions before training. Our first format had no closing delimiter, and the model then
@@ -579,7 +599,11 @@ mono\_s. A result that is off by a small amount costs \resTrackCStressAtomWrong{
 its minus sign (e.g.\ \texttt{12-20=8}) costs \resTrackCStressAtomSign{} nats with the circuit,
 of which the veto on ``='' contributes the difference to \resTrackCStressNoVetoSign{} without
 vetoes. A system that must model erroneous text would need softer vetoes; ours encodes that
-stated arithmetic is correct.
+stated arithmetic is correct. The rule also has blind spots that our held-out text does not
+contain. It reads only the digits next to the operator, so it takes \texttt{1.5+2=} for
+\texttt{5+2=} and \texttt{3{,}000+500=} for \texttt{000+500=}, and it takes a range or a score
+followed by ``='' (\texttt{3-5=moderate}) for a subtraction; Section~\ref{sec:pretrained_circuit}
+meets one such case in web text.
 \begin{table}[t]
 \centering\small
 \caption{A calculator tool versus the circuit under the gate: percentage of exact answers.
@@ -599,10 +623,13 @@ untouched. The monolithic models need replay of all four data types to avoid for
 give them half new biographies and half replay of all four types, at 50M tokens (twice the
 expert update). Table~\ref{tab:scratch_update} shows the result.
 \begin{itemize}
-\item The monolithic models learn the new facts but lose on every other type: mono\_s gets worse
-on stories, on code and on every mixed format, and forgets old facts.
+\item The monolithic models learn the new facts but lose elsewhere: mono\_s gets worse
+on stories, on code and on every mixed format, and forgets old facts. Their math loss does not
+move (mono\_s \resTrackCUpdMonoSMathBefore{} before and \resTrackCUpdMonoSMathAfter{} after,
+mono\_m \resTrackCUpdMonoMMathBefore{} and \resTrackCUpdMonoMMathAfter{}).
 \item The gated system's other experts are unchanged by construction, and old and new facts are
-both recalled.
+both recalled. Its loss on stories and code moves by at most 0.01 nats, through the updated
+expert's share in the mixture.
 \item An update without exposure gives back a little of the mixed-text gain, all of it in
 biography segments. If the update keeps the expert's exposure mix, the mixed-text loss returns
 to its pre-update value on every format, and recall is the best of any update
@@ -621,7 +648,8 @@ training templates.}
 \paragraph{Limitations of this study.} The models are small and the facts and arithmetic are
 synthetic. The mixed formats were designed by us, and two held-out families are few. The gate
 itself trains on a single format. We repeat the expert training over \resTrackCExpertSeeds{} data
-orders, but all seeds branch from one seed model and the baselines are trained once.
+orders, and the monolithic baselines over two seeds, but all expert seeds branch from one seed model,
+and the calculator baseline and the fact-update baselines are trained once.
 Section~\ref{sec:pretrained} tests the same gate with pretrained models.
 
 \section{Pretrained experts that share a tokenizer}
@@ -663,7 +691,8 @@ mixture uses one set of weights for every token, chosen to minimise the loss on 
 training documents. Two oracles bound what routing could achieve: the label oracle uses the
 expert of each token's segment type, and the token oracle the best expert for each token in
 hindsight. Criteria for each step were written down before the step's expert outputs were
-computed. We report three gate seeds; their spread is at most \resTrackBOneSeedSdMax{} nats
+computed. The fixed mixture was added as a control in the first step after that step's criteria
+had been evaluated, and was part of the criteria from the second step on. We report three gate seeds; their spread is at most \resTrackBOneSeedSdMax{} nats
 in step 1 and of the same order in step 2.
 
 \subsection{Prose and code}
@@ -724,8 +753,10 @@ by \resTrackBCleanMathMargin{} on held-out math. The fixed mixture itself beats 
 single expert by \resTrackBCleanEnsembleMin--\resTrackBCleanEnsembleMax{} on mixed text, so
 ensembling still provides most of the gain and routing a consistent further part. The weights
 follow the segment type without labels: on math segments the gate gives the math expert
-\resTrackBCleanWeightMathOnMath{} and Coder \resTrackBCleanWeightCoderOnMath{}. Notably, the
-math expert is the weakest single model there; its errors are complementary to the others'.
+\resTrackBCleanWeightMathOnMath{} and Coder \resTrackBCleanWeightCoderOnMath{}. Notably, on the
+math segments of these blank-line documents the math expert is the weakest single model, although
+it is the best one on whole GSM8K problems (Table~\ref{tab:pretrained_math}); its errors are
+complementary to the others'.
 \begin{table}[t]
 \centering\small
 \caption{Adding a math expert (Qwen2.5-Math-1.5B). Loss in nats per token for the run in
@@ -737,14 +768,68 @@ whole GSM8K test split, so its rows are not the same documents.}
 {\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_b_step2.tex}{\input{tables/track_b_step2}}{\pending{table}}}
 \end{table}
 
+\subsection{An exact expert under the pretrained gate}
+\label{sec:pretrained_circuit}
+
+Qwen2.5-Math-1.5B is not a strong specialist on GSM8K-style text in terms of loss. A sharper
+test of routing needs an expert that is clearly better on part of the text, and the compiled
+arithmetic expert of Section~\ref{sec:scratch_circuit} is one. Qwen's tokenizer, like ours,
+writes every digit as its own token and has tokens for ``='' and ``=-'', so the circuit expert
+works over Qwen's vocabulary without change. We add it to the frozen step-1 gate over
+Qwen2.5-0.5B and Qwen2.5-Coder-0.5B (the math model is left out because generation runs every
+expert at every step, and three models do not fit 4\,GB). The gate takes the two-level form of
+Section~\ref{sec:scratch_circuit}: the circuit's weight comes from its own two confidence
+features through a linear head, and the step-1 gate splits the remaining weight between the
+language models as before. Only the head's three parameters are trained, on 1.5M tokens of
+documents that mix FineWeb-Edu prose, code and synthetic arithmetic, without routing labels;
+the step-1 gate is unchanged, so this is also a test of H2 with pretrained experts. Tests and
+criteria were fixed before any outputs were computed: exact answers ($\geq 0.99$) in every
+cell of held-out equations, $\geq 0.95$ inside other text, a loss within 0.005 nats of the
+gate alone on prose, code and notebooks, and a circuit weight $\geq 0.9$ where it is active
+and $\leq 0.01$ where it is not. We changed one thing after a first look: the head had first
+been fitted for 500 steps, where its weight on the active circuit was 0.72, below the last
+criterion, and the loss was still falling. The pre-registration fixed no step count, and the
+head is now fitted to convergence; the other criteria were read off only then.
+
+All four criteria hold. The circuit's weight is \resTrackBCircLamOn{} where it is active and
+\resTrackBCircLamOff{} elsewhere. Table~\ref{tab:pretrained_circuit} gives exact-answer rates
+of live greedy decoding. The pretrained models, alone or under the gate, get most one-digit sums
+and products right but few longer ones, and none from 16 digits on; subtraction fails already
+at one digit. These models continue a bare equation without any instruction; prompted chat
+versions do better on short operands (Table~\ref{tab:length}). Inside prose or code, Base is exact on a fraction \resTrackBCircInTextBase{} of
+the items, Coder on \resTrackBCircInTextCoder{} and the gate over both on
+\resTrackBCircInTextGate{}. With the circuit, the system is exact on every item, up to 32 digits, and inside prose
+or code, on a new line or on the same line. On the answer tokens of held-out mixed documents
+the loss falls from \resTrackBCircActGateBlank{} to \resTrackBCircActCircBlank{} nats
+(\resTrackBCircActiveBlank{} tokens, blank-line format) and from \resTrackBCircActGateInline{}
+to \resTrackBCircActCircInline{} (inline). On prose, code and notebooks, where the circuit
+never becomes active, the loss rises by \resTrackBCircCostProse{}, \resTrackBCircCostCode{} and
+\resTrackBCircCostNotebook{} nats: the price of the small weight it keeps while abstaining.
+These losses are computed without the vetoes, which are applied in decoding only. We therefore
+checked the vetoes against the text. On the \resTrackBVetoScanTokens{} tokens of prose, code and
+notebooks the circuit issues \resTrackBVetoScanRespected{} vetoes and the text violates
+\resTrackBVetoScanViolated{} of them. In the two mixed sets it violates
+\resTrackBVetoMixedViolated{}: the web text contains the range \texttt{3-5=moderate}, which the
+circuit reads as a subtraction with a negative result.
+\begin{table}[t]
+\centering\small
+\caption{A compiled arithmetic expert added to the frozen gate over Qwen2.5-0.5B (Base) and
+Qwen2.5-Coder-0.5B (Coder): fraction of exact answers under live greedy decoding. Top: held-out
+equations by digits per operand (40 per cell). Bottom: an equation after a prose or code
+segment, on a new line or the same line ($+$, $-$, $\times$ at 4 and 16 digits, 20 per
+operation and length).}
+\label{tab:pretrained_circuit}
+{\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_b_circuit.tex}{\input{tables/track_b_circuit}}{\pending{table}}}
+\end{table}
+
 \paragraph{Limitations.} The experts are small (0.5B and 1.5B parameters) and from one model
-family, and we measure loss only, not generated answers. Qwen2.5-Math-1.5B is not a strong
-specialist on GSM8K-style text in terms of loss, so a sharper test of routing needs an expert
-that is clearly better on part of the text, such as the compiled circuit of
-Section~\ref{sec:scratch_circuit}. The repeated run with unseen math was decided after the
+family, and apart from the arithmetic above we measure loss, not generated answers. The
+arithmetic in the circuit test is synthetic and the circuit's coverage is narrow: it acts only
+on an explicit equation. The repeated run with unseen math was decided after the
 pre-registered run had failed, and its margins are close to the threshold we set. We have not
 replaced one pretrained expert by another, a test of H2 that Section~\ref{sec:scratch_update}
-makes only with experts trained from scratch.
+makes only with experts trained from scratch; adding the circuit with the gate frozen is the
+closest test here.
 
 % =====================================================================================
 \section{Ablations and cost}
@@ -758,7 +843,9 @@ items (Section~\ref{sec:scratch_circuit}).
 \centering\small
 \caption{Ablations on the seeded experts of Section~\ref{sec:scratch} (development items, 50
 per cell). Mixed: loss on mixed text (nats per token). Arithmetic: percentage of exact answers
-by digits per operand. $\lambda_{\mathrm{circ}}$: the circuit's mean weight where it is active.}
+by digits per operand. $\lambda_{\mathrm{circ}}$: the circuit's mean weight where it is active.
+The three rows without the circuit use an earlier gate that reads hidden states only, without
+the confidence features; with them the probability mixture has the same loss on mixed text.}
 \label{tab:ablation}
 {\footnotesize\setlength{\tabcolsep}{3pt}\IfFileExists{tables/track_c_ablation.tex}{\input{tables/track_c_ablation}}{\pending{table}}}
 \end{table}
@@ -779,8 +866,9 @@ head, or a linear head on confidences divided by $\log|V|$, the circuit's weight
 one half ($\lambda_{\mathrm{circ}}$ in Table~\ref{tab:ablation}): the active and abstaining states then differ by about one unit per feature, and one bias
 must trade the two. Below one half, the circuit can win only where the language-model experts
 are unsure, as on long operands; on shorter ones they are confidently wrong, and it loses. Measured in
-nats, the same linear head separates the two states clearly; the weight goes to almost one
-where the circuit is active, and the answers are exact at every length.
+nats, the same linear head separates the two states clearly; the weight rises above one half
+where the circuit is active (\resTrackCSeededLambdaMin--\resTrackCSeededLambdaMax{} over three
+gate seeds), and the answers are exact at every length.
 
 \paragraph{Vetoes.} Without vetoes, exactness falls with operand length. The language-model
 experts, which still hold a small share of the weight, keep proposing a digit after the answer
@@ -791,27 +879,33 @@ Section~\ref{sec:scratch_circuit}.
 \paragraph{Cost.} Training the gate costs \resTrackCGateFlopsPct\% of the training budget of a
 system in Section~\ref{sec:scratch}, and the gate's own forward pass is negligible next to the
 experts'. The compiled arithmetic expert runs once per equation, on the CPU, and its answer is
-cached. The real cost is at inference: every language-model expert runs on every token, so
+cached; for a subtraction it also runs once per digit of the second operand, to know the sign
+for the veto. The real cost is at inference: every language-model expert runs on every token, so
 generating with $E$ experts costs about $E$ times one expert, as for any ensemble. Hard routing
 would avoid this, but Table~\ref{tab:ablation} shows what it costs in loss. In
-Section~\ref{sec:pretrained} the experts ran one at a time over stored data, which fits a 4\,GB
-GPU but is not a decoding setup.
+Section~\ref{sec:pretrained} the gates were trained on stored expert outputs, one model at a
+time; the circuit test decodes with both 0.5B models live on the same 4\,GB GPU.
 
 % =====================================================================================
 \section{Discussion and limitations}
 \label{sec:discussion}
 
 \paragraph{What the results support.} At small scale and matched compute, separate experts
-combined by a label-free gate are a real alternative to one dense model (H1): they win on their
-own data types and on fact recall, and on mixed text once they have read foreign context in
+combined by a label-free gate are a real alternative to one dense model. H1 holds in part: they
+win on stories, code and fact recall, while the monolithic model keeps a lower loss on
+biographies and, narrowly, on math; and they win on mixed text once they have read foreign context in
 varied formats during training, including in formats held out from all training. Without that
 exposure they lose on mixed text, and the loss is not a routing failure: each expert reads
 foreign context badly. Updating one expert leaves the others unchanged, the gate needs no
-retraining, and the monolithic alternative pays on every other data type (H2). An exact expert
+retraining, and the monolithic alternative pays on stories, code, mixed text and old facts,
+though not on math (H2). An exact expert
 can join the same mixture with no labels, and with the two-level gate and vetoes it is exact
 where a model trained to call a calculator is not. With pretrained experts the gate still beats
 the best single expert and the best fixed mixture, but most of the gain over a single expert is
-ensembling; routing adds a smaller, consistent part.
+ensembling; routing adds a smaller, consistent part. Where one expert is clearly better on
+part of the text, routing is decisive: the compiled expert added to the frozen pretrained gate
+takes over the answer tokens with weight near one and makes every held-out answer exact, at a
+cost of about a thousandth of a nat elsewhere.
 
 \paragraph{A failure mode of label-free gating.} The gate learns whom to trust from the
 experts' performance on its own training data. If an expert has memorised that data, the gate
@@ -829,11 +923,13 @@ designed by us, and two held-out format families are few.
 several rounds, judged on development items, before the last steps were pre-registered. We
 report the failed runs and re-test the final design on held-out items, but a reader should give
 the pre-registered results more weight than the others.
-\item \textbf{Evaluation.} Pretrained experts are compared by loss only, without generated
-answers or benchmarks, and the baselines and the seed model of Section~\ref{sec:scratch} were
-trained once each.
+\item \textbf{Evaluation.} Pretrained experts are compared by loss, and by generated answers
+only for arithmetic; there are no standard benchmarks, and in Section~\ref{sec:scratch} the seed model, the calculator baseline and the fact-update
+baselines were trained once each (the monolithic baselines twice).
 \item \textbf{Exact experts.} Vetoes encode that stated arithmetic is correct, so text that
-quotes a wrong result is heavily penalised. The compiled experts are slow in our unoptimised
+quotes a wrong result is heavily penalised; the rule misreads decimals, thousands separators
+and ranges followed by ``=''; and the circuit's weight under the from-scratch gate depends on
+the gate's seed. The compiled experts are slow in our unoptimised
 reference implementation and their scratchpads grow quadratically for multiplication and
 division; positions in float64 bound the sequence length to roughly $10^5$--$10^6$ tokens;
 repeated unary minus is not parsed, and division truncates.
@@ -843,7 +939,7 @@ repeated unary minus is not parsed, and division truncates.
 \paragraph{Future work.} A frozen backbone whose weights cannot be changed, with facts and tools
 added, revoked and removed through external experts, was part of our plan and is not in this
 paper. Other open steps are replacing one pretrained expert by another, generation benchmarks,
-and a compiled expert under the gate of pretrained experts.
+and compiled experts that act on less explicit cues than a written equation.
 
 \bibliographystyle{tmlr}
 \bibliography{references_v2}

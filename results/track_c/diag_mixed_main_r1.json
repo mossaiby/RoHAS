@@ -1,0 +1,61 @@
+{
+ "meta": {
+  "git_commit": "6bd1d76b672fe4e20f90820068ef25b4eaf15be4",
+  "git_dirty": true,
+  "timestamp": "2026-11-11T23:32:42",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.5.1+cu121",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "4.48.3",
+  "wall_time_s": 7.77
+ },
+ "data": {
+  "systems": {
+   "main_mono_s_r1": {
+    "all": 1.981304407119751,
+    "lang": 2.4313342571258545,
+    "lang_early": 2.760521650314331,
+    "lang_late": 2.252622127532959,
+    "facts": 0.981508731842041,
+    "facts_early": 1.3485970497131348,
+    "facts_late": 0.5888816714286804,
+    "math": 0.8045257329940796,
+    "math_early": 1.619742512702942,
+    "math_late": 0.5405768156051636,
+    "code": 2.4478185176849365,
+    "code_early": 3.5438215732574463,
+    "code_late": 2.309107780456543
+   },
+   "main_mono_m_r1": {
+    "all": 2.0524210929870605,
+    "lang": 2.4497177600860596,
+    "lang_early": 2.6937499046325684,
+    "lang_late": 2.317235231399536,
+    "facts": 1.1535338163375854,
+    "facts_early": 1.4518975019454956,
+    "facts_late": 0.8344122767448425,
+    "math": 0.793646514415741,
+    "math_early": 1.576061725616455,
+    "math_late": 0.540317952632904,
+    "code": 2.5458054542541504,
+    "code_early": 3.5724823474884033,
+    "code_late": 2.4158682823181152
+   }
+  },
+  "token_share": {
+   "lang": 0.138214111328125,
+   "facts": 0.086968994140625,
+   "math": 0.204901123046875,
+   "code": 0.569915771484375
+  },
+  "early_share": 0.207720947265625,
+  "early_tokens": 16,
+  "data": "mixed_val"
+ },
+ "macros": {}
+}

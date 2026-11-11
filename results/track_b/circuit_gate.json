@@ -1,0 +1,338 @@
+{
+ "meta": {
+  "git_commit": "6bd1d76b672fe4e20f90820068ef25b4eaf15be4",
+  "git_dirty": true,
+  "timestamp": "2026-11-11T17:51:42",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1"
+ },
+ "data": {
+  "head": {
+   "w": [
+    -0.6197538375854492,
+    0.6213149428367615,
+    8.305964469909668
+   ],
+   "train_loss": 2.443002700805664,
+   "active_frac": 0.031939927488565445,
+   "lambda_active": 0.9997525811195374,
+   "lambda_inactive": 0.0014989468036219478
+  },
+  "loss": {
+   "prose_val": {
+    "tokens": 304128,
+    "active_tokens": 0,
+    "loss": {
+     "base": 2.7660484313964844,
+     "coder": 2.8372650146484375,
+     "gate": 2.7428503036499023,
+     "gate_circuit": 2.7441415786743164
+    },
+    "lambda_active": null,
+    "lambda_inactive": 0.0014989465707913041
+   },
+   "code_val": {
+    "tokens": 302592,
+    "active_tokens": 0,
+    "loss": {
+     "base": 1.5383955240249634,
+     "coder": 1.479750633239746,
+     "gate": 1.460644245147705,
+     "gate_circuit": 1.4620048999786377
+    },
+    "lambda_active": null,
+    "lambda_inactive": 0.0014989468036219478
+   },
+   "notebooks_val": {
+    "tokens": 301056,
+    "active_tokens": 0,
+    "loss": {
+     "base": 1.9863359928131104,
+     "coder": 1.8914097547531128,
+     "gate": 1.873305320739746,
+     "gate_circuit": 1.8739049434661865
+    },
+    "lambda_active": null,
+    "lambda_inactive": 0.0014989465707913041,
+    "loss_prose": {
+     "base": 2.652904987335205,
+     "coder": 2.5357043743133545,
+     "gate": 2.517948865890503,
+     "gate_circuit": 2.5185275077819824
+    },
+    "loss_code": {
+     "base": 1.55252206325531,
+     "coder": 1.4720919132232666,
+     "gate": 1.4537612199783325,
+     "gate_circuit": 1.454374074935913
+    }
+   },
+   "a4_blank_val": {
+    "tokens": 199680,
+    "active_tokens": 6254,
+    "loss": {
+     "base": 2.5763723850250244,
+     "coder": 2.5777785778045654,
+     "gate": 2.4987616539001465,
+     "gate_circuit": 2.478884696960449
+    },
+    "lambda_active": 0.9997529983520508,
+    "lambda_inactive": 0.0014989469200372696,
+    "loss_active": {
+     "base": 0.5908923149108887,
+     "coder": 0.7240195870399475,
+     "gate": 0.595649242401123,
+     "gate_circuit": 0.00017273667617700994
+    },
+    "loss_prose": {
+     "base": 3.467982769012451,
+     "coder": 3.5560505390167236,
+     "gate": 3.4230122566223145,
+     "gate_circuit": 3.421189546585083
+    },
+    "loss_code": {
+     "base": 2.2759196758270264,
+     "coder": 2.206700325012207,
+     "gate": 2.161450147628784,
+     "gate_circuit": 2.1615686416625977
+    },
+    "loss_math": {
+     "base": 2.019780397415161,
+     "coder": 2.059795618057251,
+     "gate": 1.9796702861785889,
+     "gate_circuit": 1.890154242515564
+    }
+   },
+   "a4_inline_val": {
+    "tokens": 200192,
+    "active_tokens": 11777,
+    "loss": {
+     "base": 2.8023672103881836,
+     "coder": 2.744617462158203,
+     "gate": 2.670192241668701,
+     "gate_circuit": 2.638218879699707
+    },
+    "lambda_active": 0.9997528791427612,
+    "lambda_inactive": 0.0014989468036219478,
+    "loss_active": {
+     "base": 0.5165525674819946,
+     "coder": 0.6245903372764587,
+     "gate": 0.512312114238739,
+     "gate_circuit": 0.00016494924784637988
+    },
+    "loss_prose": {
+     "base": 3.682671546936035,
+     "coder": 3.7201883792877197,
+     "gate": 3.583733081817627,
+     "gate_circuit": 3.580467700958252
+    },
+    "loss_code": {
+     "base": 3.3458642959594727,
+     "coder": 3.165708303451538,
+     "gate": 3.1260340213775635,
+     "gate_circuit": 3.125994920730591
+    },
+    "loss_math": {
+     "base": 1.792026400566101,
+     "coder": 1.742546558380127,
+     "gate": 1.6919077634811401,
+     "gate_circuit": 1.6177639961242676
+    }
+   }
+  },
+  "gen": {
+   "base": {
+    "equations": {
+     "+/1": 0.775,
+     "+/4": 0.25,
+     "+/8": 0.025,
+     "+/16": 0.0,
+     "+/32": 0.0,
+     "-/1": 0.125,
+     "-/4": 0.0,
+     "-/8": 0.0,
+     "-/16": 0.0,
+     "-/32": 0.0,
+     "*/1": 0.95,
+     "*/2": 0.225,
+     "*/4": 0.0,
+     "*/8": 0.0
+    },
+    "in_text": {
+     "prose/blank/+/4": 0.2,
+     "prose/blank/+/16": 0.0,
+     "prose/blank/-/4": 0.0,
+     "prose/blank/-/16": 0.0,
+     "prose/blank/*/4": 0.0,
+     "prose/blank/*/16": 0.0,
+     "prose/inline/+/4": 0.35,
+     "prose/inline/+/16": 0.0,
+     "prose/inline/-/4": 0.05,
+     "prose/inline/-/16": 0.0,
+     "prose/inline/*/4": 0.0,
+     "prose/inline/*/16": 0.0,
+     "code/blank/+/4": 0.35,
+     "code/blank/+/16": 0.0,
+     "code/blank/-/4": 0.0,
+     "code/blank/-/16": 0.0,
+     "code/blank/*/4": 0.0,
+     "code/blank/*/16": 0.0,
+     "code/inline/+/4": 0.4,
+     "code/inline/+/16": 0.0,
+     "code/inline/-/4": 0.15,
+     "code/inline/-/16": 0.0,
+     "code/inline/*/4": 0.0,
+     "code/inline/*/16": 0.0
+    },
+    "in_text_all": 0.0625,
+    "seconds": 619
+   },
+   "coder": {
+    "equations": {
+     "+/1": 0.95,
+     "+/4": 0.2,
+     "+/8": 0.0,
+     "+/16": 0.0,
+     "+/32": 0.0,
+     "-/1": 0.1,
+     "-/4": 0.0,
+     "-/8": 0.0,
+     "-/16": 0.0,
+     "-/32": 0.0,
+     "*/1": 0.9,
+     "*/2": 0.1,
+     "*/4": 0.0,
+     "*/8": 0.0
+    },
+    "in_text": {
+     "prose/blank/+/4": 0.05,
+     "prose/blank/+/16": 0.0,
+     "prose/blank/-/4": 0.0,
+     "prose/blank/-/16": 0.0,
+     "prose/blank/*/4": 0.0,
+     "prose/blank/*/16": 0.0,
+     "prose/inline/+/4": 0.05,
+     "prose/inline/+/16": 0.0,
+     "prose/inline/-/4": 0.0,
+     "prose/inline/-/16": 0.0,
+     "prose/inline/*/4": 0.0,
+     "prose/inline/*/16": 0.0,
+     "code/blank/+/4": 0.1,
+     "code/blank/+/16": 0.0,
+     "code/blank/-/4": 0.0,
+     "code/blank/-/16": 0.0,
+     "code/blank/*/4": 0.0,
+     "code/blank/*/16": 0.0,
+     "code/inline/+/4": 0.1,
+     "code/inline/+/16": 0.0,
+     "code/inline/-/4": 0.05,
+     "code/inline/-/16": 0.0,
+     "code/inline/*/4": 0.0,
+     "code/inline/*/16": 0.0
+    },
+    "in_text_all": 0.014583333333333334,
+    "seconds": 705
+   },
+   "gate": {
+    "equations": {
+     "+/1": 0.95,
+     "+/4": 0.3,
+     "+/8": 0.025,
+     "+/16": 0.0,
+     "+/32": 0.0,
+     "-/1": 0.1,
+     "-/4": 0.0,
+     "-/8": 0.0,
+     "-/16": 0.0,
+     "-/32": 0.0,
+     "*/1": 0.975,
+     "*/2": 0.125,
+     "*/4": 0.0,
+     "*/8": 0.0
+    },
+    "in_text": {
+     "prose/blank/+/4": 0.2,
+     "prose/blank/+/16": 0.0,
+     "prose/blank/-/4": 0.0,
+     "prose/blank/-/16": 0.0,
+     "prose/blank/*/4": 0.0,
+     "prose/blank/*/16": 0.0,
+     "prose/inline/+/4": 0.3,
+     "prose/inline/+/16": 0.0,
+     "prose/inline/-/4": 0.05,
+     "prose/inline/-/16": 0.0,
+     "prose/inline/*/4": 0.0,
+     "prose/inline/*/16": 0.0,
+     "code/blank/+/4": 0.35,
+     "code/blank/+/16": 0.0,
+     "code/blank/-/4": 0.0,
+     "code/blank/-/16": 0.0,
+     "code/blank/*/4": 0.0,
+     "code/blank/*/16": 0.0,
+     "code/inline/+/4": 0.45,
+     "code/inline/+/16": 0.0,
+     "code/inline/-/4": 0.15,
+     "code/inline/-/16": 0.0,
+     "code/inline/*/4": 0.0,
+     "code/inline/*/16": 0.0
+    },
+    "in_text_all": 0.0625,
+    "seconds": 1409
+   },
+   "gate_circuit": {
+    "equations": {
+     "+/1": 1.0,
+     "+/4": 1.0,
+     "+/8": 1.0,
+     "+/16": 1.0,
+     "+/32": 1.0,
+     "-/1": 1.0,
+     "-/4": 1.0,
+     "-/8": 1.0,
+     "-/16": 1.0,
+     "-/32": 1.0,
+     "*/1": 1.0,
+     "*/2": 1.0,
+     "*/4": 1.0,
+     "*/8": 1.0
+    },
+    "in_text": {
+     "prose/blank/+/4": 1.0,
+     "prose/blank/+/16": 1.0,
+     "prose/blank/-/4": 1.0,
+     "prose/blank/-/16": 1.0,
+     "prose/blank/*/4": 1.0,
+     "prose/blank/*/16": 1.0,
+     "prose/inline/+/4": 1.0,
+     "prose/inline/+/16": 1.0,
+     "prose/inline/-/4": 1.0,
+     "prose/inline/-/16": 1.0,
+     "prose/inline/*/4": 1.0,
+     "prose/inline/*/16": 1.0,
+     "code/blank/+/4": 1.0,
+     "code/blank/+/16": 1.0,
+     "code/blank/-/4": 1.0,
+     "code/blank/-/16": 1.0,
+     "code/blank/*/4": 1.0,
+     "code/blank/*/16": 1.0,
+     "code/inline/+/4": 1.0,
+     "code/inline/+/16": 1.0,
+     "code/inline/-/4": 1.0,
+     "code/inline/-/16": 1.0,
+     "code/inline/*/4": 1.0,
+     "code/inline/*/16": 1.0
+    },
+    "in_text_all": 1.0,
+    "seconds": 1404
+   }
+  }
+ },
+ "macros": {}
+}

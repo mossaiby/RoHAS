@@ -701,3 +701,73 @@ text, does the gate beat the best *fixed* mixture of the same experts?
   - **Lesson for the paper:** a gate trained on data that an expert has memorised learns
     to trust that expert where it will not help. Gate training data must be unseen by
     every expert, which pretrained models make hard to guarantee.
+
+### Track B, step 3: the compiled circuit under the pretrained gate (pre-registered 2026-11-11, before any data or outputs)
+
+The routing claim at its sharpest: an exact specialist joins frozen pretrained experts.
+
+- **Experts:** Qwen2.5-0.5B and Qwen2.5-Coder-0.5B (step 1, frozen), plus the compiled
+  arithmetic circuit (circuit_expert.py, unchanged; Qwen splits digits into single tokens and
+  has "=" and "=-" tokens, as the Track C tokenizer does). The math model is left out:
+  generation runs all experts live, and three models do not fit 4 GB.
+- **Gate:** the step-1 gate b_gate_s0, *frozen*, plus the two-level atom head of Track C: the
+  circuit's weight comes from its own two confidence features in nats through a linear head,
+  and the LM experts share the rest as before. Only the head's 3 parameters are trained. So
+  the test also asks H2 on pretrained models: an expert is added without retraining the gate.
+  Vetoes are applied at generation; the loss evaluation is without vetoes (for correct text
+  they can only lower the loss, since false vetoes were never seen in Track C).
+- **Data** (Qwen tokenizer): documents mixing prose, code and arithmetic segments (Track C
+  synth.math_doc lines: equations of up to 5 digits for + and −, 3 for ×, and templated word
+  problems). 1.5M tokens in the blank-line format train the head; validation has the blank
+  and inline formats (200k tokens each).
+- **Evaluation:**
+  - Live greedy generation on held-out equations ("a op b", the next token restricted to
+    "=" or "=-" as in Track C): + and − at 1, 4, 8, 16, 32 digits, × at 1, 2, 4, 8; 40
+    items per cell. Systems: base alone, Coder alone, the gate, the gate with the circuit.
+  - Arithmetic inside other text: a prose or code segment, then a blank line or a space,
+    then the equation; +, −, × at 4 and 16 digits; 20 per cell.
+  - Loss: on prose_val, code_val, notebooks_val (no equations) and on the new mixed sets.
+- **Criteria:**
+  - C1: the gate with the circuit is exact (≥ 0.99) in every cell of the held-out
+    equations.
+  - C2: ≥ 0.95 exact inside other text, in every context and join.
+  - C3: on prose, code and notebooks, its loss is within 0.005 of the gate alone.
+  - C4: the circuit's weight is ≥ 0.9 where it is active and ≤ 0.01 where it is not.
+- **Correction before any criterion was read off (step count):** the head was first fitted for
+  500 Adam steps from zero, which had not converged: weight 0.72 where the circuit is active,
+  loss still falling. At 2,000 steps the weight is 0.97, at 10,000 steps 0.9998 (0.0015 where
+  inactive), and the loss then changes by < 1e-5. The pre-registration fixed no step count;
+  the head is now trained to convergence (10,000 steps). The circuit is never wrong on this
+  data (0 mismatches in 30,956 active positions), so the optimum is a weight near 1.
+
+**Result (2026-11-11; results/track_b/circuit_gate.json): all four criteria hold.**
+
+- C4: the head's weight is 0.9998 where the circuit is active and 0.0015 where it is not.
+- C1: the gate with the circuit is exact in all 14 equation cells (1.000, up to 32 digits for
+  + and −, 8 for ×). The pretrained experts alone, and the gate over them, reach 0.95–1.0 at
+  one digit and fall to 0.000–0.025 from 8 digits on (− fails from 4 digits).
+- C2: 1.000 in all 24 in-text cells (prose and code contexts, blank and inline joins). Without
+  the circuit: base 0.06, Coder 0.01, gate 0.06.
+- C3: prose 2.7441 vs 2.7429 (+0.0013), code 1.4620 vs 1.4606 (+0.0014), notebooks 1.8739 vs
+  1.8733 (+0.0006). The circuit is never active on these sets (0 active positions); the cost is
+  the 0.0015 weight it keeps where it is inactive.
+- On the mixed sets the answer tokens fall from 0.596 to 0.0002 nats (blank) and 0.512 to
+  0.0002 (inline); the overall loss falls by 0.020 and 0.032.
+
+### Track C: a second seed of the monolithic baselines (decided 2026-11-11, before training)
+
+mono_s and mono_m were trained once each. Both are retrained with seed 1 (initialisation and
+data order) and exactly the settings of train_main_mono_*.json
+(experiments/track_c/run_baseline_seed.py), and evaluated as before: losses and fact recall,
+held-out arithmetic for mono_s, and mixed text in all four formats. There is no criterion; the
+second seed is reported next to the first in every table where the baselines appear, and any
+claim of the paper that the second seed reverses is withdrawn.
+
+**Result (2026-11-12; eval_main_r1, eval_main_r1_heldout, diag_mixed_*_main_r1):** no claim is
+reversed. Mixed-text loss moves by at most 0.024 nats between seeds (mono_s 1.990/1.981 blank,
+1.858/1.856 long, 2.680/2.704 inline, 2.258/2.255 marked; mono_m 2.052, 1.925, 2.648, 2.280
+with seed 1). The worst varied-exposure expert seed beats the best of the four monolithic runs
+on every format, by at least 0.061 nats. Per-type losses agree within 0.04; mono_s's fact
+recall with training templates varies more (0.70 / 0.86), held-out templates 0.06 / 0.03.
+mono_s seed 1 fails arithmetic from 8 digits (+, −) and 4 digits (×), as seed 0. The run was
+paused by hibernation, so its wall-clock times are invalid.
