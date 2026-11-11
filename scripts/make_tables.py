@@ -334,6 +334,125 @@ def track_c_macros(res):
     return out
 
 
+# ---- track B ------------------------------------------------------------------------
+B_FMTS = ["blank", "long", "inline", "marked"]
+
+
+def b_runs(res, prefix):
+    """The eval dicts of <prefix>_s0, _s1, ... that exist."""
+    return [res[f"track_b/{prefix}_s{s}"]["data"] for s in range(10) if f"track_b/{prefix}_s{s}" in res]
+
+
+def b_gate(runs, f):
+    import statistics
+    return statistics.mean(r["eval"][f]["loss"]["gate"] for r in runs)
+
+
+def b_rows(runs, sets, cols):
+    rows = []
+    for f, label in sets:
+        L = runs[0]["eval"][f]["loss"]
+        vals = [b_gate(runs, f) if c == "gate" else L.get(c) for c in cols]
+        rows.append(f"{label} & " + " & ".join(fmt3(v) for v in vals) + r" \\")
+    return rows
+
+
+def table_track_b_step1(res):
+    runs = b_runs(res, "b_gate")
+    if not runs:
+        return "% no results\n"
+    sets = [("prose_val", "Prose"), ("code_val", "Code")] + \
+           [(f"mixed_{m}_val", f"Mixed, {m}") for m in B_FMTS] + [("notebooks_val", "Notebooks")]
+    head = "Data & Base & Coder & Fixed mix & Gate & Label oracle & Token oracle"
+    return tabular("l" + "r" * 6, head, b_rows(runs, sets, ["base", "coder", "constant", "gate", "oracle_label",
+                                                            "oracle_token"]))
+
+
+def table_track_b_step2(res):
+    clean, cont = b_runs(res, "b3c_gate"), b_runs(res, "b3_gate")
+    if not clean:
+        return "% no results\n"
+    pairs = [("prose_val", "prose_val", "Prose"), ("code_val", "code_val", "Code"),
+             ("mathc_val", "math_val", "Math (GSM8K)")] + \
+            [(f"m3c_{m}_val", f"m3_{m}_val", f"Mixed, {m}") for m in B_FMTS] + \
+            [("notebooks_val", "notebooks_val", "Notebooks")]
+    rows = []
+    for fc, fx, label in pairs:
+        L = clean[0]["eval"][fc]["loss"]
+        g = b_gate(clean, fc)
+        dx = cont[0]["eval"][fx]["loss"]["constant"] - b_gate(cont, fx) if cont else None
+        rows.append(f"{label} & " + " & ".join(fmt3(v) for v in (L["base"], L["coder"], L["math"], L["constant"], g)) +
+                    f" & {L['constant'] - g:+.3f} & " + ("--" if dx is None else f"{dx:+.3f}") + r" \\")
+    head = (r"& \multicolumn{6}{c}{Gate trained on unseen math} & Train math \\" "\n"
+            r"\cmidrule(lr){2-7}\cmidrule(lr){8-8}" "\n"
+            r"Data & Base & Coder & Math & Fixed mix & Gate & $\Delta$ & $\Delta$")
+    return tabular("l" + "r" * 7, head, rows)
+
+
+def track_b_macros(res):
+    import statistics
+    out = {}
+
+    def put(name, v, f=fmt3):
+        if v is not None:
+            out[("track_b", name)] = f(v)
+    one = b_runs(res, "b_gate")
+    if one:
+        E = one[0]["eval"]
+        best = lambda f, ex: min(E[f]["loss"][e] for e in ex)  # noqa: E731
+        mixed = [f"mixed_{m}_val" for m in B_FMTS]
+        m = [best(f, ["base", "coder"]) - b_gate(one, f) for f in mixed]
+        put("OneMixedMarginMin", min(m))
+        put("OneMixedMarginMax", max(m))
+        put("OneNotebookMargin", best("notebooks_val", ["base", "coder"]) - b_gate(one, "notebooks_val"))
+        put("OneProseMargin", best("prose_val", ["base", "coder"]) - b_gate(one, "prose_val"))
+        put("OneCodeMargin", best("code_val", ["base", "coder"]) - b_gate(one, "code_val"))
+        c = [E[f]["loss"]["constant"] - b_gate(one, f) for f in E]
+        put("OneConstGapMin", min(c))
+        put("OneConstGapMax", max(c))
+        put("OneSeeds", len(one), str)
+        put("OneGateParams", one[0]["train"]["gate_params"] / 1e6, lambda z: f"{z:.2f}M")
+        sd = max(statistics.stdev(r["eval"][f]["loss"]["gate"] for r in one) for f in E) if len(one) > 1 else None
+        put("OneSeedSdMax", sd, lambda z: f"{z:.4f}")
+    cont, clean = b_runs(res, "b3_gate"), b_runs(res, "b3c_gate")
+    for key, runs, pre in (("Cont", cont, "m3"), ("Clean", clean, "m3c")):
+        if not runs:
+            continue
+        E = runs[0]["eval"]
+        for m in B_FMTS:
+            f = f"{pre}_{m}_val"
+            put(f"{key}Margin{m.capitalize()}", E[f]["loss"]["constant"] - b_gate(runs, f))
+            worst = max(r["eval"][f]["loss"]["gate"] for r in runs)
+            put(f"{key}MarginWorst{m.capitalize()}", E[f]["loss"]["constant"] - worst)
+        fm = "mathc_val" if key == "Clean" else "math_val"
+        put(f"{key}MathMargin", E[fm]["loss"]["constant"] - b_gate(runs, fm))
+        put(f"{key}NotebookMargin", E["notebooks_val"]["loss"]["constant"] - b_gate(runs, "notebooks_val"))
+        ens = [min(E[f"{pre}_{m}_val"]["loss"][e] for e in ("base", "coder", "math")) - E[f"{pre}_{m}_val"]["loss"]["constant"]
+               for m in B_FMTS]
+        put(f"{key}EnsembleMin", min(ens))
+        put(f"{key}EnsembleMax", max(ens))
+        mg = [E[f"{pre}_{m}_val"]["loss"]["constant"] - b_gate(runs, f"{pre}_{m}_val") for m in B_FMTS]
+        put(f"{key}MarginMin", min(mg))
+        put(f"{key}MarginMax", max(mg))
+        wm = E[f"{pre}_blank_val"].get("weight_math")
+        if wm:
+            put(f"{key}WeightMathOnMath", wm["math"], fmt2)
+            put(f"{key}WeightCoderOnMath", wm["coder"], fmt2)
+        cw = runs[0]["constant_weights"]
+        for e, w in zip(("Base", "Coder", "Math"), cw):
+            put(f"{key}Fixed{e}", w, fmt2)
+        put(f"{key}GateParams", runs[0]["train"]["gate_params"] / 1e6, lambda z: f"{z:.2f}M")
+    sl = res.get("track_b/segment_losses", {}).get("data", {})
+    if sl:
+        for f, key in (("m3_train", "TrainSplit"), ("m3_blank_val", "TestSplit")):
+            for e in ("base", "coder", "math"):
+                put(f"Seg{key}{e.capitalize()}", sl[f]["math"][e])
+    return out
+
+
+B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2)]
+
+
 def derived_macros(res):
     """Numbers computed from several fields; named like the stored macros."""
     out = {}
@@ -349,6 +468,7 @@ def derived_macros(res):
                 out[("track_a", word + "Tokens")] = f"{sc[(op, n)]['tokens']:,.0f}"
                 out[("track_a", word + "Seconds")] = f"{sc[(op, n)]['seconds']:.2f}"
     out.update(track_c_macros(res))
+    out.update(track_b_macros(res))
     return out
 
 
@@ -370,7 +490,7 @@ def main():
             with open(os.path.join(PAPER, "tables", f"{name}.tex"), "w", encoding="utf-8") as f:
                 f.write(HEADER + build(res[key]))
             print(f"wrote paper/tables/{name}.tex")
-    for name, build in C_TABLES:
+    for name, build in C_TABLES + B_TABLES:
         with open(os.path.join(PAPER, "tables", f"{name}.tex"), "w", encoding="utf-8") as f:
             f.write(HEADER + build(res))
         print(f"wrote paper/tables/{name}.tex")

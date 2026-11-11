@@ -35,8 +35,12 @@ all training (\resTrackCMixedInlineVaried{} vs.\ \resTrackCMixedInlineMonoS{} an
 \resTrackCMixedMarkedVaried{} vs.\ \resTrackCMixedMarkedMonoS{} nats per token). New facts are
 added by updating one expert, with no change elsewhere, while the monolithic model loses on
 every other data type. A compiled arithmetic expert under the same gate gives exact answers to
-32 digits. \pending{Track B headline:
-pretrained experts sharing a tokenizer; swap test.} Compiled arithmetic experts and an
+32 digits. Over frozen pretrained experts that share a
+tokenizer (prose, code and math models of 0.5B--1.5B parameters), the same gate beats the
+best single expert and also the best fixed mixture of the experts on mixed text, by
+\resTrackBCleanMarginMin--\resTrackBCleanMarginMax{} nats per token, although most of the gain
+over a single expert comes from ensembling, and only when the gate's training data is new to
+every expert. \pending{Swap test.} Compiled arithmetic experts and an
 expression-parser expert that calls them are exact on \resTrackACorrectnessCases{} test cases
 with \resTrackACorrectnessErrors{} errors, at operand lengths where prompted models of up to
 1.5B parameters fail. \pending{Tools: abstention and revocation results.}
@@ -499,7 +503,124 @@ and~\ref{sec:frozen} test the same ideas with pretrained models.
 
 \section{Pretrained experts that share a tokenizer}
 \label{sec:pretrained}
-\todo{Track B: Qwen2.5 base/Coder/Math, cached outputs, staged build-up, swap tests.}
+Section~\ref{sec:scratch} trained every expert ourselves. Here the experts are off-the-shelf
+pretrained models that share one tokenizer, kept frozen; only the gate is trained. We add
+experts one at a time and ask at each step whether the gate does better than two simpler
+alternatives: the best single expert, and the best \emph{fixed} mixture of the same experts.
+The second comparison separates routing, weights that depend on the token, from plain
+ensembling.
+
+\subsection{Setup}
+\label{sec:pretrained_setup}
+
+\paragraph{Experts.} Qwen2.5-0.5B~\citep{qwen2025qwen25} for prose, Qwen2.5-Coder-0.5B
+\citep{hui2024qwen25coder} for code and, in the second step, Qwen2.5-Math-1.5B
+\citep{yang2024qwen25math} for math. All three use the same tokenizer and vocabulary; Coder
+is the base model trained further, mostly on code. The models run in bfloat16 on a laptop GPU
+with 4\,GB of memory, one at a time: each is run once over all data, and its final hidden
+states, the log-probability of every actual next token, and the entropy and largest
+log-probability of every next-token distribution are stored. The gate then trains and is
+evaluated on these stored outputs.
+
+\paragraph{Data.} Prose comes from FineWeb-Edu~\citep{penedo2024fineweb}, code from
+CodeParrot~\citep{codeparrot} with the filters and repository split of
+Section~\ref{sec:scratch}, and math from GSM8K~\citep{cobbe2021gsm8k}: a question followed by
+its worked solution. Mixed documents join segments of different types in the four formats of
+Section~\ref{sec:scratch}. The gate trains on the blank-line format only, so the other three
+are held out. As natural mixed text, never used in training, we take Jupyter notebooks from
+GitHub (markdown cells and the code that follows them). The experts were likely
+pre-trained on web text and code like ours, so absolute losses are optimistic; we compare systems, not absolute values.
+
+\paragraph{Gate and controls.} The gate is the confidence gate of Section~\ref{sec:scratch}:
+it reads every expert's hidden state, its causal mean over the last 32 positions, and each
+expert's two confidence features, and mixes the experts' probabilities. It has
+\resTrackBOneGateParams{} parameters with two experts and \resTrackBCleanGateParams{} with
+three, and trains for three epochs on mixed documents, without routing labels. The fixed
+mixture uses one set of weights for every token, chosen to minimise the loss on the gate's
+training documents. Two oracles bound what routing could achieve: the label oracle uses the
+expert of each token's segment type, and the token oracle the best expert for each token in
+hindsight. Criteria for each step were written down before the step's expert outputs were
+computed. We report three gate seeds; their spread is at most \resTrackBOneSeedSdMax{} nats
+in step 1 and of the same order in step 2.
+
+\subsection{Prose and code}
+\label{sec:pretrained_two}
+
+Table~\ref{tab:pretrained_two} gives the results. The gate beats the better single expert by
+\resTrackBOneMixedMarginMin--\resTrackBOneMixedMarginMax{} nats per token on the four mixed
+formats and by \resTrackBOneNotebookMargin{} on the notebooks. On pure prose and pure code it
+is also better than either expert alone, by \resTrackBOneProseMargin{} and
+\resTrackBOneCodeMargin{}. It even beats the label oracle: Coder turns out to be the better
+model on the notebooks' markdown as well, and the gate, which has no labels, gives it more
+weight there. All pre-registered criteria hold.
+
+The fixed mixture, however, comes within \resTrackBOneConstGapMin--\resTrackBOneConstGapMax{}
+nats of the gate everywhere. With these two experts the gain is almost entirely ensembling.
+This is what one should expect of experts that overlap this much: Coder continues the base
+model's training, so each is a reasonable fallback for the other, and averaging already
+helps. In Section~\ref{sec:scratch}, routing mattered because each expert was poor outside
+its own data type.
+\begin{table}[t]
+\centering\small
+\caption{Prose and code experts (Qwen2.5-0.5B and Qwen2.5-Coder-0.5B): loss in nats per
+token. The gate is the mean of three seeds; the fixed mixture uses one weight pair for every
+token. Notebooks are natural mixed text that no system trains on.}
+\label{tab:pretrained_two}
+\IfFileExists{tables/track_b_step1.tex}{\input{tables/track_b_step1}}{\pending{table}}
+\end{table}
+
+\subsection{Adding a math expert}
+\label{sec:pretrained_math}
+
+The math step asks the routing question directly. Our criterion, fixed in advance, was that on
+each mixed format the gate must beat the best fixed mixture of the three experts by at least
+0.02 nats.
+
+\paragraph{Contaminated training data.} In the pre-registered design, the math segments of the
+gate's training documents came from GSM8K's training split, and validation used its test
+split. The criterion failed on two of the four formats (blank lines \resTrackBContMarginBlank,
+inline \resTrackBContMarginInline). On GSM8K itself the gate was worse than the fixed mixture
+($\Delta = \resTrackBContMathMargin$ nats per token). The cause is that the experts have memorised
+GSM8K's training problems, the math expert most of all. On math segments from the training
+split its loss is \resTrackBSegTrainSplitMath{}, against \resTrackBSegTrainSplitBase{} for the
+base model; on unseen test problems it is \resTrackBSegTestSplitMath{}, worse than the base
+model's \resTrackBSegTestSplitBase{}. The gate therefore learned to trust the math expert on
+math (weight \resTrackBContWeightMathOnMath{}, Coder \resTrackBContWeightCoderOnMath{}), and on
+unseen problems that trust was misplaced. The lesson is general: a gate trained without labels
+learns which expert to trust from the expert's performance on the gate's training data, so
+that data must be as new to every expert as the data it will be used on. With pretrained
+models this is hard to guarantee.
+
+\paragraph{Unseen training data.} We then repeated the step with GSM8K's test split divided
+in two by item index: one half for the gate's training documents, the other for validation.
+This repetition was decided after the first run had failed, and we report both runs.
+Table~\ref{tab:pretrained_math} gives the results. The gate now beats the best fixed mixture
+by \resTrackBCleanMarginMin--\resTrackBCleanMarginMax{} nats per token on all four mixed
+formats, for each of the three seeds, by \resTrackBCleanNotebookMargin{} on the notebooks and
+by \resTrackBCleanMathMargin{} on held-out math. The fixed mixture itself beats the best
+single expert by \resTrackBCleanEnsembleMin--\resTrackBCleanEnsembleMax{} on mixed text, so
+ensembling still provides most of the gain and routing a consistent further part. The weights
+follow the segment type without labels: on math segments the gate gives the math expert
+\resTrackBCleanWeightMathOnMath{} and Coder \resTrackBCleanWeightCoderOnMath{}. Notably, the
+math expert is the weakest single model there; its errors are complementary to the others'.
+\begin{table}[t]
+\centering\small
+\caption{Adding a math expert (Qwen2.5-Math-1.5B). Loss in nats per token for the run in
+which the gate trains on math that no expert has seen; $\Delta$ is the gain of the gate over
+the best fixed mixture (positive: the gate is better). The last column gives $\Delta$ for the
+pre-registered run, whose gate trained on GSM8K's training split; its validation sets use the
+whole GSM8K test split, so its rows are not the same documents.}
+\label{tab:pretrained_math}
+{\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_b_step2.tex}{\input{tables/track_b_step2}}{\pending{table}}}
+\end{table}
+
+\paragraph{Limitations.} The experts are small (0.5B and 1.5B parameters) and from one model
+family, and we measure loss only, not generated answers. Qwen2.5-Math-1.5B is not a strong
+specialist on GSM8K-style text in terms of loss, so a sharper test of routing needs an expert
+that is clearly better on part of the text, such as the compiled circuit of
+Section~\ref{sec:scratch_circuit}. The repeated run with unseen math was decided after the
+pre-registered run had failed, and its margins are close to the threshold we set.
+\pending{Swap test for H2 (replacing an expert) and generation benchmarks.}
 
 \section{Frozen backbone and tools}
 \label{sec:frozen}
