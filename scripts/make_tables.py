@@ -370,6 +370,23 @@ def track_c_macros(res):
             lam = [e["routing"]["circuit_lambda_active"] for e in es]
             put(f"{key}Min", min(lam), fmt2)
             put(f"{key}Max", max(lam), fmt2)
+    # follow-up: the circuit's head refitted to convergence on the frozen gates (refit_head.py)
+    rf = res.get("track_c/refit_head", {}).get("data", {}).get("gates", {})
+    cv = res.get("track_c/eval_conv_heldout", {}).get("data", {}).get("systems", {})
+    if rf and cv:
+        orig = {"main_ctxv20_gate_atom": "main_ctxv20", "main_ctxv20_gate_atom_s1": "main_ctxv20_seeds",
+                "main_ctxv20_gate_atom_s2": "main_ctxv20_seeds", "main_seeded_gate_atom": "main_circuit_atom",
+                "main_seeded_gate_atom_s1": "main_circuit_seeds", "main_seeded_gate_atom_s2": "main_circuit_seeds"}
+        lam = [cv[f"gate:{g}_conv:prob"]["routing"]["circuit_lambda_active"] for g in rf]
+        off = [cv[f"gate:{g}_conv:prob"]["routing"]["circuit_lambda_inactive"] for g in rf]
+        put("RefitLambdaMin", min(lam), lambda z: f"{z:.4f}")
+        put("RefitLambdaOffMax", max(off), lambda z: f"{z:.4f}")
+        put("RefitGates", len(rf), str)
+        dl = [abs(cv[f"gate:{g}_conv:prob"]["loss"][t] - ev(res, orig[g], f"gate:{g}:prob")["loss"][t])
+              for g in rf for t in TYPES + ["mixed"]]
+        put("RefitLossChangeMax", max(dl), lambda z: f"{z:.4f}")
+        ar = [x for g in rf for op in cv[f"gate:{g}_conv:prob"]["arith_number"].values() for x in op.values()]
+        put("RefitArithMinPct", 100 * min(ar), lambda z: f"{z:.0f}")
     # math loss of the monolithic models before and after the fact update (it does not move)
     for size, cap in (("s", "S"), ("m", "M")):
         b, u = ev(res, "main", f"model:main_mono_{size}"), ev(res, "main_add_facts", f"model:main_add_replay_all_mono_{size}")

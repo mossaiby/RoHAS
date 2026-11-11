@@ -1,0 +1,143 @@
+{
+ "meta": {
+  "git_commit": "9bf4d6fc045aed0b2fc01fcdb3bb2487ae7305c2",
+  "git_dirty": true,
+  "timestamp": "2026-11-12T00:42:11",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.5.1+cu121",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "4.48.3"
+ },
+ "data": {
+  "gates": {
+   "main_ctxv20_gate_atom": {
+    "head_before": [
+     -0.5407508611679077,
+     0.5289323925971985,
+     3.5900330543518066
+    ],
+    "head_after": [
+     -0.9011482000350952,
+     0.8906604051589966,
+     10.137835502624512
+    ],
+    "loss": 1.8652712106704712,
+    "lambda_active_before": 0.973115086555481,
+    "lambda_inactive_before": 0.0023551513440907,
+    "lambda_active_after": 0.9999604225158691,
+    "lambda_inactive_after": 0.002452968154102564,
+    "max_change_last_half": 5.1021575927734375e-05,
+    "active_positions": 13984,
+    "tokens": 491520
+   },
+   "main_ctxv20_gate_atom_s1": {
+    "head_before": [
+     -0.7529456615447998,
+     -0.08014009147882462,
+     0.05123068764805794
+    ],
+    "head_after": [
+     -1.2892359495162964,
+     0.4607808291912079,
+     9.7853422164917
+    ],
+    "loss": 1.8654000759124756,
+    "lambda_active_before": 0.512445330619812,
+    "lambda_inactive_before": 0.0024447492323815823,
+    "lambda_active_after": 0.9999436736106873,
+    "lambda_inactive_after": 0.0025126226246356964,
+    "max_change_last_half": 0.00012236833572387695,
+    "active_positions": 13984,
+    "tokens": 491520
+   },
+   "main_ctxv20_gate_atom_s2": {
+    "head_before": [
+     -0.7743416428565979,
+     0.2028225064277649,
+     2.7582497596740723
+    ],
+    "head_after": [
+     -1.1761841773986816,
+     0.6061996817588806,
+     10.076775550842285
+    ],
+    "loss": 1.8661978244781494,
+    "lambda_active_before": 0.9402928948402405,
+    "lambda_inactive_before": 0.002359614707529545,
+    "lambda_active_after": 0.9999578595161438,
+    "lambda_inactive_after": 0.002512063132598996,
+    "max_change_last_half": 6.837211549282074e-05,
+    "active_positions": 13984,
+    "tokens": 491520
+   },
+   "main_seeded_gate_atom": {
+    "head_before": [
+     -0.9530025720596313,
+     0.9452239871025085,
+     4.921426296234131
+    ],
+    "head_after": [
+     -2.0867362022399902,
+     2.468031167984009,
+     15.848156929016113
+    ],
+    "loss": 2.101421356201172,
+    "lambda_active_before": 0.9927500486373901,
+    "lambda_inactive_before": 5.114977284392808e-06,
+    "lambda_active_after": 0.9999998807907104,
+    "lambda_inactive_after": 1.1433590185738751e-11,
+    "max_change_last_half": 1.5497207641601562e-06,
+    "active_positions": 13984,
+    "tokens": 491520
+   },
+   "main_seeded_gate_atom_s1": {
+    "head_before": [
+     -0.9394423365592957,
+     0.10663992166519165,
+     1.29441237449646
+    ],
+    "head_after": [
+     -2.2527291774749756,
+     1.5383373498916626,
+     12.496273040771484
+    ],
+    "loss": 2.1016252040863037,
+    "lambda_active_before": 0.7845862507820129,
+    "lambda_inactive_before": 0.00029396722675301135,
+    "lambda_active_after": 0.9999961853027344,
+    "lambda_inactive_after": 3.900652301158658e-10,
+    "max_change_last_half": 4.76837158203125e-05,
+    "active_positions": 13984,
+    "tokens": 491520
+   },
+   "main_seeded_gate_atom_s2": {
+    "head_before": [
+     -1.0584460496902466,
+     0.48738184571266174,
+     3.9217772483825684
+    ],
+    "head_after": [
+     -2.380737781524658,
+     1.9203245639801025,
+     14.91944408416748
+    ],
+    "loss": 2.1025209426879883,
+    "lambda_active_before": 0.980539083480835,
+    "lambda_inactive_before": 4.5056542148813605e-05,
+    "lambda_active_after": 0.9999995231628418,
+    "lambda_inactive_after": 4.4431926887744666e-11,
+    "max_change_last_half": 4.0531158447265625e-06,
+    "active_positions": 13984,
+    "tokens": 491520
+   }
+  },
+  "steps": 10000,
+  "batches": 120
+ },
+ "macros": {}
+}

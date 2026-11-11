@@ -284,62 +284,17 @@ unembedding---whose weights are written by hand. Nothing is trained. We build ex
 decimal addition, subtraction, multiplication, and division, and an expression-parser expert
 that calls them.
 
-\subsection{Three primitives}
-\label{sec:primitives}
-Positions are embedded as the pair $(p, p^2)$. This makes three operations exact:
-\begin{itemize}
-\item \textbf{Lookup.} A head whose score is $-\Lambda (p_k - t)^2$, written as a bilinear form in
-$(p_k^2, p_k)$ and $(1, t)$, reads the token at exactly position $t$, provided $t$ is a linear
-function of the residual stream. The correct key beats any other by a factor $e^{-\Lambda}$.
-\item \textbf{Select.} A head whose key score is a linear function of key features attends to its
-maximiser, for example the most recent row separator.
-\item \textbf{Integer ReLU logic.} On integers, $[x\ge c] = \mathrm{ReLU}(x-c+1)-\mathrm{ReLU}(x-c)$
-and $[x = c]$ is a three-ReLU triangle. Gates are integer expressions equal to $1$ when active and
-$\le 0$ otherwise.
-\end{itemize}
-The design rule for every expert is: \emph{every position a step must read is a linear function
-of the current position and of positions of marker tokens}. Under that rule no weight depends on
-operand length.
-
-\subsection{Addition and subtraction without a scratchpad}
-Addition emits the most significant digit first, in one forward pass per digit. The carry into
-digit $i$ is the carry flag of the first later digit pair whose sum is not $9$. It is found with
-a linked list: each pair records whether its sum differs from $9$, each position records the
-nearest such pair at or before it, and the first such pair after $i$ is the one whose
-predecessor equals $i$'s. Subtraction is ten's complement through the same construction, with
-an initial carry of $1$ read from the start token and a second chain for $b-a$. Both chains share
-the linked list because $a_i + 9 - b_i \neq 9 \iff a_i \neq b_i$; the carry out of the first chain
-is the sign.
-
-\subsection{Multiplication and division with a scratchpad}
-Multiplication writes one row per digit $b_r$ of the multiplier. Each row holds a copy of the
-multiplier shifted by $r$ (so its last symbol is $b_r$), the multiplicand shifted by $r$, and the
-running sum $S_r = S_{r-1} + A\,b_r\,10^r$, least significant first. A sum cell is a single token
-whose embedding exposes both its digit and its carry, so the carry chain needs no extra tokens.
-All rows have the same length $m + 2(n+m) + 1$, so every value a cell needs lies at a fixed
-offset.
-
-Division is restoring long division. Each row is a bring-down row or the $c$-th subtraction of
-the current step, and carries the unconsumed dividend digits, the quotient so far, and the
-working number with per-digit borrows. The next row's type depends only on the previous row:
-after a bring-down comes the first subtraction; after a non-negative subtraction comes the next;
-after a negative one comes a bring-down that appends the quotient digit $c-1$ and reuses the row
-\emph{two} back, which is always the last non-negative value. Small state lives in token
-identities and unbounded state is copied row to row at linear offsets.
-
-\subsection{An expression parser that calls other experts}
-\label{sec:parser}
-The parser expert evaluates expressions with brackets, precedence, left associativity, and
-unary minus. It rewrites the expression one step per row. For each binary operation it emits a
-call block \texttt{[a op b?}; a fixed routing rule hands \texttt{a op b} to the matching arithmetic expert
-and appends its answer, which the parser copies into the next row. A group holding one number
-loses its brackets. Finding the next operation needs no bracket counting: the first closing
-bracket of a row closes an innermost group, its partner is the nearest opener before it, and
-inside that group exactly one multiplicative (else additive) operator is marked as the first
-since its opener. These facts are summarised at each row terminator, from which the writer of the
-next row reads them.
-
-\subsection{Results}
+In brief (Appendix~\ref{app:construction} gives the constructions), positions are embedded as
+$(p, p^2)$, which makes three operations exact: a head that reads the token at a position that
+is a linear function of the residual stream, a head that attends to the maximiser of a linear
+key score, and integer logic built from ReLUs. Every position a step must read is a linear
+function of the current position and of positions of marker tokens, so no weight depends on
+operand length. Addition and subtraction emit the answer most significant digit first, one
+forward pass per digit, finding each carry through a linked list over digit pairs.
+Multiplication and division write a scratchpad of fixed-shape rows (long multiplication and
+restoring long division). The expression parser rewrites an expression one step per row and
+hands each binary operation to the matching arithmetic expert. Every expert is small and sparse,
+and operand length is paid in generated tokens, not in weights (Appendix~\ref{app:cost}).
 \label{sec:compiled_results}
 
 \paragraph{Correctness.} Table~\ref{tab:correctness} lists every test suite: all operand pairs
@@ -366,37 +321,6 @@ are compared in Section~\ref{sec:scratch_circuit} (Table~\ref{tab:scratch_arith}
 divisor has half as many). Same items for every system.}
 \label{tab:length}
 \IfFileExists{tables/track_a_length_generalisation.tex}{\input{tables/track_a_length_generalisation}}{\pending{table}}
-\end{table}
-
-\paragraph{Cost.} Table~\ref{tab:cost} gives the size of each expert. All are tiny next to a
-language model, and sparse: only \resTrackANonzeroPctMin--\resTrackANonzeroPctMax\% of the
-weights are nonzero, because every head reads and writes a few named features and every MLP unit
-tests one integer condition. Size does not depend on operand length; length is paid in generated
-tokens (Table~\ref{tab:scaling}). Addition and subtraction emit one token per digit
-(\resTrackAAddTwoFiftySixTokens{} tokens in total for two 256-digit operands). The scratchpad for
-multiplication grows as $m(2n+3m+1)$ (\resTrackAMulThirtyTwoTokens{} tokens for $32\times 32$
-digits), and division grows as at most about $11n(2n+m+4)$ (\resTrackADivThirtyTwoTokens{} tokens
-for 32 by 16 digits). The parser adds about one row per operation, and each row grows with the
-expression (\resTrackAParserDepthFiveTokens{} tokens for a balanced tree with 31 operators).
-Wall-clock times are for a single-threaded NumPy reference with a key/value cache. They are
-\resTrackAAddTwoFiftySixSeconds\,s, \resTrackAMulThirtyTwoSeconds\,s and
-\resTrackADivThirtyTwoSeconds\,s for these cases. The implementation is not optimised; the point
-is exactness at every length, not speed. On an accelerator, the cost per token of an expert with
-$d_{\mathrm{model}}\le 243$ is negligible next to that of the base model it is blended with, so
-the real cost is the extra tokens of Table~\ref{tab:scaling}.
-\begin{table}[t]
-\centering\small
-\caption{Size of the compiled experts. ``Blocks'' counts attention and MLP sublayers. The last
-column is the percentage of nonzero weights.}
-\label{tab:cost}
-\IfFileExists{tables/track_a_cost.tex}{\input{tables/track_a_cost}}{\pending{table}}
-\end{table}
-\begin{table}[t]
-\centering\small
-\caption{Tokens per call (prompt and scratchpad) and wall-clock time of the NumPy reference
-against operand size. The averages are over 5 random cases, or 2 cases above 16 digits.}
-\label{tab:scaling}
-\IfFileExists{tables/track_a_scaling.tex}{\input{tables/track_a_scaling}}{\pending{table}}
 \end{table}
 
 % =====================================================================================
@@ -538,7 +462,16 @@ essentially zero elsewhere. Again no routing labels are used. The weight varies 
 seed: over three seeds it is \resTrackCCircuitLambdaMin--\resTrackCCircuitLambdaMax{}. The
 lowest value is only just above the one half that the remark of Section~\ref{sec:method}
 requires, so that seed is exact but fragile; the head is trained for a fixed number of steps
-together with the gate and has not converged there.
+together with the gate and has not converged there. In a follow-up, decided after these runs,
+we froze every other part of the gate and refitted only the head's three parameters to
+convergence, as in Section~\ref{sec:pretrained_circuit}. Over all \resTrackCRefitGates{} gates
+with the circuit (three seeds here and three for the seeded experts of
+Section~\ref{sec:ablations}) the weight is then at least \resTrackCRefitLambdaMin{} where the
+circuit is active and at most \resTrackCRefitLambdaOffMax{} where it is not, the held-out
+arithmetic and word problems stay exact, and no loss in Table~\ref{tab:scratch_types} or on
+mixed text changes by more than \resTrackCRefitLossChangeMax{} nats. The low weights were
+therefore an artefact of training the head for too few steps, not of the design. The tables
+report the original, jointly trained gates.
 
 Table~\ref{tab:scratch_arith} gives exact-answer accuracy on items not used during development.
 Every trained system, including mono\_s, fails from 8 digits ($+$, $-$) or 4 digits ($\times$).
@@ -868,7 +801,8 @@ must trade the two. Below one half, the circuit can win only where the language-
 are unsure, as on long operands; on shorter ones they are confidently wrong, and it loses. Measured in
 nats, the same linear head separates the two states clearly; the weight rises above one half
 where the circuit is active (\resTrackCSeededLambdaMin--\resTrackCSeededLambdaMax{} over three
-gate seeds), and the answers are exact at every length.
+gate seeds; at least \resTrackCRefitLambdaMin{} once the head is refitted to convergence,
+Section~\ref{sec:scratch_circuit}), and the answers are exact at every length.
 
 \paragraph{Vetoes.} Without vetoes, exactness falls with operand length. The language-model
 experts, which still hold a small share of the weight, keep proposing a digit after the answer
@@ -928,8 +862,8 @@ only for arithmetic; there are no standard benchmarks, and in Section~\ref{sec:s
 baselines were trained once each (the monolithic baselines twice).
 \item \textbf{Exact experts.} Vetoes encode that stated arithmetic is correct, so text that
 quotes a wrong result is heavily penalised; the rule misreads decimals, thousands separators
-and ranges followed by ``=''; and the circuit's weight under the from-scratch gate depends on
-the gate's seed. The compiled experts are slow in our unoptimised
+and ranges followed by ``=''; and under the from-scratch gate the circuit's weight depends on
+the gate's seed unless its head is trained to convergence. The compiled experts are slow in our unoptimised
 reference implementation and their scratchpads grow quadratically for multiplication and
 division; positions in float64 bound the sequence length to roughly $10^5$--$10^6$ tokens;
 repeated unary minus is not parsed, and division truncates.
@@ -943,4 +877,97 @@ and compiled experts that act on less explicit cues than a written equation.
 
 \bibliographystyle{tmlr}
 \bibliography{references_v2}
+
+\appendix
+\section{Construction of the compiled experts}
+\label{app:construction}
+
+\subsection{Three primitives}
+\label{sec:primitives}
+Positions are embedded as the pair $(p, p^2)$. This makes three operations exact:
+\begin{itemize}
+\item \textbf{Lookup.} A head whose score is $-\Lambda (p_k - t)^2$, written as a bilinear form in
+$(p_k^2, p_k)$ and $(1, t)$, reads the token at exactly position $t$, provided $t$ is a linear
+function of the residual stream. The correct key beats any other by a factor $e^{-\Lambda}$.
+\item \textbf{Select.} A head whose key score is a linear function of key features attends to its
+maximiser, for example the most recent row separator.
+\item \textbf{Integer ReLU logic.} On integers, $[x\ge c] = \mathrm{ReLU}(x-c+1)-\mathrm{ReLU}(x-c)$
+and $[x = c]$ is a three-ReLU triangle. Gates are integer expressions equal to $1$ when active and
+$\le 0$ otherwise.
+\end{itemize}
+The design rule for every expert is: \emph{every position a step must read is a linear function
+of the current position and of positions of marker tokens}. Under that rule no weight depends on
+operand length.
+
+\subsection{Addition and subtraction without a scratchpad}
+Addition emits the most significant digit first, in one forward pass per digit. The carry into
+digit $i$ is the carry flag of the first later digit pair whose sum is not $9$. It is found with
+a linked list: each pair records whether its sum differs from $9$, each position records the
+nearest such pair at or before it, and the first such pair after $i$ is the one whose
+predecessor equals $i$'s. Subtraction is ten's complement through the same construction, with
+an initial carry of $1$ read from the start token and a second chain for $b-a$. Both chains share
+the linked list because $a_i + 9 - b_i \neq 9 \iff a_i \neq b_i$; the carry out of the first chain
+is the sign.
+
+\subsection{Multiplication and division with a scratchpad}
+Multiplication writes one row per digit $b_r$ of the multiplier. Each row holds a copy of the
+multiplier shifted by $r$ (so its last symbol is $b_r$), the multiplicand shifted by $r$, and the
+running sum $S_r = S_{r-1} + A\,b_r\,10^r$, least significant first. A sum cell is a single token
+whose embedding exposes both its digit and its carry, so the carry chain needs no extra tokens.
+All rows have the same length $m + 2(n+m) + 1$, so every value a cell needs lies at a fixed
+offset.
+
+Division is restoring long division. Each row is a bring-down row or the $c$-th subtraction of
+the current step, and carries the unconsumed dividend digits, the quotient so far, and the
+working number with per-digit borrows. The next row's type depends only on the previous row:
+after a bring-down comes the first subtraction; after a non-negative subtraction comes the next;
+after a negative one comes a bring-down that appends the quotient digit $c-1$ and reuses the row
+\emph{two} back, which is always the last non-negative value. Small state lives in token
+identities and unbounded state is copied row to row at linear offsets.
+
+\subsection{An expression parser that calls other experts}
+\label{sec:parser}
+The parser expert evaluates expressions with brackets, precedence, left associativity, and
+unary minus. It rewrites the expression one step per row. For each binary operation it emits a
+call block \texttt{[a op b?}; a fixed routing rule hands \texttt{a op b} to the matching arithmetic expert
+and appends its answer, which the parser copies into the next row. A group holding one number
+loses its brackets. Finding the next operation needs no bracket counting: the first closing
+bracket of a row closes an innermost group, its partner is the nearest opener before it, and
+inside that group exactly one multiplicative (else additive) operator is marked as the first
+since its opener. These facts are summarised at each row terminator, from which the writer of the
+next row reads them.
+
+\subsection{Size and cost}
+\label{app:cost}
+\paragraph{Cost.} Table~\ref{tab:cost} gives the size of each expert. All are tiny next to a
+language model, and sparse: only \resTrackANonzeroPctMin--\resTrackANonzeroPctMax\% of the
+weights are nonzero, because every head reads and writes a few named features and every MLP unit
+tests one integer condition. Size does not depend on operand length; length is paid in generated
+tokens (Table~\ref{tab:scaling}). Addition and subtraction emit one token per digit
+(\resTrackAAddTwoFiftySixTokens{} tokens in total for two 256-digit operands). The scratchpad for
+multiplication grows as $m(2n+3m+1)$ (\resTrackAMulThirtyTwoTokens{} tokens for $32\times 32$
+digits), and division grows as at most about $11n(2n+m+4)$ (\resTrackADivThirtyTwoTokens{} tokens
+for 32 by 16 digits). The parser adds about one row per operation, and each row grows with the
+expression (\resTrackAParserDepthFiveTokens{} tokens for a balanced tree with 31 operators).
+Wall-clock times are for a single-threaded NumPy reference with a key/value cache. They are
+\resTrackAAddTwoFiftySixSeconds\,s, \resTrackAMulThirtyTwoSeconds\,s and
+\resTrackADivThirtyTwoSeconds\,s for these cases. The implementation is not optimised; the point
+is exactness at every length, not speed. On an accelerator, the cost per token of an expert with
+$d_{\mathrm{model}}\le 243$ is negligible next to that of the base model it is blended with, so
+the real cost is the extra tokens of Table~\ref{tab:scaling}.
+\begin{table}[t]
+\centering\small
+\caption{Size of the compiled experts. ``Blocks'' counts attention and MLP sublayers. The last
+column is the percentage of nonzero weights.}
+\label{tab:cost}
+\IfFileExists{tables/track_a_cost.tex}{\input{tables/track_a_cost}}{\pending{table}}
+\end{table}
+\begin{table}[t]
+\centering\small
+\caption{Tokens per call (prompt and scratchpad) and wall-clock time of the NumPy reference
+against operand size. The averages are over 5 random cases, or 2 cases above 16 digits.}
+\label{tab:scaling}
+\IfFileExists{tables/track_a_scaling.tex}{\input{tables/track_a_scaling}}{\pending{table}}
+\end{table}
+
 \end{document}

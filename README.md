@@ -1,5 +1,7 @@
 # Reads over Heterogeneous Atom Spaces: Modular Logit-Level Integration of Algorithmic Circuits into Language Models
 
+> **The current paper** is `paper/main_v2.tex`; see [REPRODUCE.md](REPRODUCE.md) for how each of its tables is produced. The rest of this README describes an earlier prototype.
+
 This repository provides an empirical and mathematical reference implementation of the **Valued Atom Space framework** for Large Language Models.
 
 ---

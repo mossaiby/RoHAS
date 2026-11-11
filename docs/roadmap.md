@@ -771,3 +771,25 @@ on every format, by at least 0.061 nats. Per-type losses agree within 0.04; mono
 recall with training templates varies more (0.70 / 0.86), held-out templates 0.06 / 0.03.
 mono_s seed 1 fails arithmetic from 8 digits (+, −) and 4 digits (×), as seed 0. The run was
 paused by hibernation, so its wall-clock times are invalid.
+
+### Track C follow-up: the circuit's head refitted to convergence (decided 2026-11-12, before running)
+
+Under the from-scratch gate the circuit's weight where it is active varies with the gate seed
+(main_ctxv20: 0.97 / 0.51 / 0.94; seeded: 0.99 / 0.78 / 0.98). Its 3-parameter head was trained
+jointly with the gate for a fixed number of steps, and the low seeds look unconverged, as the
+Track B head was at 500 steps. experiments/track_c/refit_head.py freezes every other part of
+these six gates and refits only the head, full batch (about 0.5M mixed_train tokens, 10,000
+Adam steps from the trained values, loss without vetoes), then evaluates the refitted gates on
+held-out arithmetic (eval seed 1000, 100 per cell), losses and routing (tag conv_heldout).
+Expected: weight ≥ 0.9 where active and ≤ 0.01 where inactive for every seed, arithmetic still
+exact, losses within 0.005 of the jointly trained gates. The paper keeps the original runs and
+reports the refit as a follow-up, whichever way it comes out.
+
+**Result (2026-11-12; refit_head.json, eval_conv_heldout.json): as expected, for all six gates.**
+The weight where the circuit is active goes from 0.97 / 0.51 / 0.94 (main_ctxv20) and
+0.99 / 0.78 / 0.98 (seeded) to ≥ 0.9999; where it is inactive it stays at 0.0025 (main_ctxv20)
+and 0.0000 (seeded). Held-out arithmetic (all cells, + and − to 32 digits, × to 8) and word
+problems are 100% for every refitted gate. Losses change by at most 0.0047 nats (a decrease,
+on math for main_ctxv20 seed 1); all other changes are ≤ 0.002. The head's output changes by
+≤ 0.0001 over the last 5,000 steps. The paper keeps the jointly trained gates in its tables and
+reports the refit as a follow-up (Section 5.4).
