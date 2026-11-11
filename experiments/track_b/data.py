@@ -18,6 +18,19 @@ files have a parallel _labels.bin, uint8, 0 = prose / markdown, 1 = code)
   mixed_<fmt>_val       300k tokens each, fmt in blank, long, inline, marked (Track C formats;
                         long, inline and marked are held out from gate training)
   notebooks_val         300k tokens
+
+--step 2 (+ math) adds, with labels 0 prose, 1 code, 2 math:
+  math      GSM8K (openai/gsm8k, main): question, newline, solution without the "<<...>>"
+            calculator annotations (the final "#### n" kept); train split for documents, test
+            split for validation
+  m3_train              1.5M tokens: prose, code and math segments (adjacent ones differ),
+                        blank-line format; a math segment is one whole GSM8K item
+  m3_<fmt>_val          200k tokens each, the four formats
+  math_val              all 1,319 GSM8K test items
+
+--step 3 (+ math, uncontaminated; added after step 2 showed that the experts memorise
+GSM8K's train split): as step 2, but the math pools are the two halves of GSM8K test by
+item index, even items for m3c_train and odd items for m3c_<fmt>_val and mathc_val
 """
 import glob
 import json
@@ -36,7 +49,7 @@ from experiments.track_c.data_mixed_ood import FORMATS  # noqa: E402
 
 OUT = os.path.join(ROOT, "data", "track_b")
 TOKENIZER = "Qwen/Qwen2.5-0.5B"
-TYPES = ["prose", "code"]
+TYPES = ["prose", "code", "math"]
 VAL = 300_000
 TRAIN = 2_000_000
 
@@ -109,7 +122,16 @@ class Writer:
         return len(self.ids)
 
 
+def gsm8k(split):
+    import pyarrow.parquet as pq
+    f = glob.glob(os.path.join(HUB, "datasets--openai--gsm8k", "snapshots", "*", "main", f"{split}-*.parquet"))[0]
+    rows = pq.read_table(f).to_pylist()
+    return [r["question"].strip() + "\n" + re.sub(r"<<[^>]*>>", "", r["answer"]).strip() for r in rows]
+
+
 def segment(kind, rng, pools, f):
+    if kind == "math":
+        return rng.choice(pools["math"])
     if kind == "prose":
         sents = re.split(r"(?<=[.!?])\s+", rng.choice(pools["prose"]))
         k = min(rng.randint(*f["sents"]), len(sents))
@@ -121,25 +143,54 @@ def segment(kind, rng, pools, f):
     return "\n".join(lines[i:i + k]).strip("\n")
 
 
-def mixed(tok, pools, fmt, target, seed, name):
+def mixed(tok, pools, fmt, target, seed, name, n_types=2):
+    """Documents of n segments; with two types they alternate, with three adjacent ones differ."""
     rng = random.Random(seed)
     f = FORMATS[fmt]
     w = Writer(tok, name, True)
     while len(w) < target:
         n = rng.randint(*f["n"])
-        first = rng.randrange(2)
+        kinds = [rng.randrange(n_types)]
+        if n_types == 2:
+            kinds = [(kinds[0] + j) % 2 for j in range(n)]       # alternate (step 1's random draws)
+        while len(kinds) < n:
+            kinds.append(rng.choice([k for k in range(n_types) if k != kinds[-1]]))
         pieces = []
-        for j in range(n):
-            k = (first + j) % 2
+        for k in kinds:
             seg = segment(TYPES[k], rng, pools, f)
             if seg:
                 pieces.append(((rng.choice(f["seps"]) if pieces else "") + seg, k))
-        if len({k for _, k in pieces}) == 2:
+        if len({k for _, k in pieces}) >= 2:
             w.doc(pieces)
     return w.close()
 
 
+def step2(tok, pools_train, pools_val, t0, clean=False):
+    if clean:
+        test = gsm8k("test")
+        pools_train["math"], pools_val["math"] = test[0::2], test[1::2]
+    else:
+        pools_train["math"], pools_val["math"] = gsm8k("train"), gsm8k("test")
+    p = "m3c" if clean else "m3"
+    counts = {f"{p}_train": mixed(tok, pools_train, "blank", 1_500_000, seed=101, name=f"{p}_train", n_types=3)}
+    for i, fmt in enumerate(["blank", "long", "inline", "marked"]):
+        counts[f"{p}_{fmt}_val"] = mixed(tok, pools_val, fmt, 200_000, seed=110 + i, name=f"{p}_{fmt}_val", n_types=3)
+    w = Writer(tok, "mathc_val" if clean else "math_val", False)
+    for d in pools_val["math"]:
+        w.doc([(d, 2)])
+    counts["math_val"] = w.close()
+    meta = {"tokenizer": TOKENIZER, "counts": counts, "gsm8k": {k: len(pools_train["math"] if k == "train" else
+                                                                       pools_val["math"]) for k in ("train", "test")},
+            "seconds": round(time.time() - t0)}
+    json.dump(meta, open(os.path.join(OUT, "meta_step3.json" if clean else "meta_step2.json"), "w"), indent=1)
+    print(json.dumps(meta, indent=1))
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3])
+    a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     t0 = time.time()
     tok = tokenizer()
@@ -150,6 +201,8 @@ def main():
     pools_val = {"prose": prose(range(700, 720)), "code": code["val"]}
     print(f"pools: prose {len(pools_train['prose'])}/{len(pools_val['prose'])}, "
           f"code {len(code['train'])}/{len(code['val'])} ({time.time() - t0:.0f}s)", flush=True)
+    if a.step in (2, 3):
+        return step2(tok, pools_train, pools_val, t0, clean=a.step == 3)
     counts = {"mixed_train": mixed(tok, pools_train, "blank", TRAIN, seed=1, name="mixed_train")}
     for i, fmt in enumerate(["blank", "long", "inline", "marked"]):
         counts[f"mixed_{fmt}_val"] = mixed(tok, pools_val, fmt, VAL, seed=10 + i, name=f"mixed_{fmt}_val")

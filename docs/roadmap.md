@@ -586,3 +586,118 @@ are added.
 - **Next:** the routing claim needs experts that differ more. The planned next step adds
   math (Qwen2.5-Math-1.5B in 4-bit) and the circuits, where one expert is far better on
   some tokens; the constant mixture is now a standard control row.
+
+### Track B, step 2: + math (pre-registered 2026-11-11, before any math-expert outputs were computed)
+
+Step 1 passed its criteria, but a fixed mixture got almost all of the gain. This step asks
+the routing question directly: with an expert that is far better than the others on some
+text, does the gate beat the best *fixed* mixture of the same experts?
+
+- **Experts:** Qwen2.5-0.5B (prose), Qwen2.5-Coder-0.5B (code), Qwen2.5-Math-1.5B (math),
+  frozen, bf16 (4-bit only if 1.5B does not fit the 4 GB GPU; then this note is amended
+  before caching). The math expert must share the tokenizer (checked on download).
+  Confound: the math expert is three times larger, so it may be better on prose and code
+  too; the per-type losses and gate weights show whether it is.
+- **Data** (data.py --step 2):
+  - math: GSM8K (openai/gsm8k, main): question, newline, the solution with the calculator
+    annotations "<<...>>" removed (the final "#### n" line kept). Train split for the
+    gate's documents, test split for validation;
+  - m3_train: 1.5M tokens of documents mixing prose, code and math segments (adjacent
+    segments differ), blank-line format; a math segment is one whole GSM8K item;
+  - validation: math_val (GSM8K test, all 1,319 items), m3 mixed sets in the four formats
+    (200k tokens each), and the step-1 prose, code and notebook sets.
+- **Gate:** the step-1 gate with three experts (hidden states of different widths
+  concatenated: 896 + 896 + 1536); same training recipe; seeds 0, 1, 2.
+- **Control:** the best constant mixture, with weights fitted on m3_train (simplex grid,
+  step 0.02).
+- **Criteria:**
+  - R1 (routing beyond ensembling): on each of the four m3 formats, the gate's loss is at
+    least 0.02 nats below the best constant mixture.
+  - R2: on math_val, the gate is within 0.02 of the math expert; on prose and code, within
+    0.02 of the better single expert.
+  - R3: on each m3 format and on notebooks, the gate is at least 0.01 below the best
+    single expert.
+- **If R1 fails,** the paper's Track B claim is limited to "mixing pretrained experts
+  helps, mostly as an ensemble", and the routing evidence rests on Track C and the circuit.
+- **Results, as pre-registered** (`results/track_b/b3_gate_s{0,1,2}.json`):
+  - Qwen2.5-Math-1.5B fits in bf16 (peak 3.4 GB at batch 2), so no quantization; it shares
+    the tokenizer exactly. Caching: about 2,000 tokens/s.
+  - Fixed mixture (fitted on m3_train): base 0.32, Coder 0.22, math 0.46.
+  - Loss, gate mean over 3 seeds (sd ≤ 0.0023):
+
+    | Set | Best single | Fixed mix | Gate | Gate vs fixed |
+    |---|---|---|---|---|
+    | prose | 2.766 | 2.740 | 2.719 | +0.022 |
+    | code | 1.480 | 1.500 | 1.449 | +0.052 |
+    | math (GSM8K test) | 1.476 | 1.304 | 1.352 | −0.048 |
+    | m3 blank | 2.168 | 2.060 | 2.064 | −0.004 |
+    | m3 long | 2.038 | 1.963 | 1.941 | +0.022 |
+    | m3 inline | 2.223 | 2.060 | 2.060 | +0.001 |
+    | m3 marked | 2.225 | 2.117 | 2.093 | +0.024 |
+    | notebooks | 1.891 | 1.806 | 1.786 | +0.020 |
+
+  - **R1 fails** (holds on long and marked, not on blank and inline). **R2 holds** (math
+    1.352 vs the math expert's 1.476; prose and code better than either expert). **R3
+    holds** everywhere, by 0.10–0.16 on mixed text.
+- **Diagnosis, after the fact: the gate's math training data is contaminated.** GSM8K's
+  train split is memorised by the experts, the math expert most:
+
+  | Math segments | Base | Coder | Math |
+  |---|---|---|---|
+  | m3_train (GSM8K train) | 1.265 | 1.389 | 0.965 |
+  | m3_blank_val (GSM8K test) | 1.557 | 1.605 | 1.621 |
+
+  - On unseen problems the math expert is no better than the base model, but on the
+    gate's training problems it is far better. So the gate learns to trust it on math (weight
+    0.63, Coder 0.04), and on test problems that trust is wrong: there the fixed mixture,
+    which keeps Coder at 0.22, wins by 0.065 on math segments.
+  - Consistent with this: the gate beats the fixed mixture by 0.10 on m3_train itself.
+  - The gate is not the problem; the training data does not match the test distribution
+    for one expert.
+- **Deviation (decided after the results above):** re-run with uncontaminated math for
+  the gate. GSM8K test is split in two halves by item index (even / odd): the even half
+  builds the gate's training documents (m3c_train), the odd half the validation sets (m3c_*,
+  mathc_val). Same criteria, same recipe. Both runs are reported. Caveat: the even half
+  repeats about 7 times in the 1.5M training tokens.
+- Also learnt: Qwen2.5-Math-1.5B is not a strong specialist on GSM8K-style text in loss
+  terms (1.621 vs the base model's 1.557 on unseen problems). Its training style differs
+  (LaTeX, chain-of-thought formats). A loss-based routing test needs an expert that is
+  clearly better on some unseen text.
+- **Results, uncontaminated re-run** (`results/track_b/b3c_gate_s{0,1,2}.json`; GSM8K test
+  halves):
+  - The math expert is no longer special on the gate's training math (m3c_train math
+    segments: base 1.564, Coder 1.614, math 1.613), as on validation.
+  - Fixed mixture (fitted on m3c_train): base 0.40, Coder 0.32, math 0.28.
+  - Loss, gate mean over 3 seeds (sd ≤ 0.0016):
+
+    | Set | Base | Coder | Math | Fixed mix | Gate | Gate vs fixed (worst seed) |
+    |---|---|---|---|---|---|---|
+    | prose | 2.766 | 2.837 | 2.983 | 2.726 | 2.720 | +0.006 (+0.005) |
+    | code | 1.538 | 1.480 | 1.803 | 1.474 | 1.449 | +0.025 (+0.025) |
+    | math (GSM8K odd half) | 1.506 | 1.507 | 1.480 | 1.308 | 1.294 | +0.014 (+0.013) |
+    | m3c blank | 2.166 | 2.188 | 2.337 | 2.051 | 2.023 | +0.029 (+0.029) |
+    | m3c long | 2.048 | 2.036 | 2.255 | 1.946 | 1.925 | +0.021 (+0.021) |
+    | m3c inline | 2.200 | 2.201 | 2.269 | 2.035 | 2.012 | +0.023 (+0.023) |
+    | m3c marked | 2.222 | 2.229 | 2.378 | 2.105 | 2.077 | +0.029 (+0.029) |
+    | notebooks | 1.986 | 1.891 | 1.937 | 1.811 | 1.786 | +0.026 (+0.024) |
+
+  - **R1 holds** on all four mixed formats for every seed (smallest margin 0.0207, long).
+    **R2 holds:** math 1.294 vs the math expert's 1.480; prose and code better than any
+    single expert. **R3 holds**, by 0.11–0.19.
+  - Gate weights on blank-format mixed text, by segment (base / Coder / math): prose 0.47 /
+    0.24 / 0.29, code 0.29 / 0.56 / 0.15, math 0.32 / 0.14 / 0.54. On math segments the math
+    expert is the worst alone (1.630), yet weighted highest. Mixing gives 1.405 there, so the
+    experts' errors are complementary.
+- **Reading, with caveats:**
+  - **The routing claim holds, modestly.** Weights that depend on the token beat any fixed
+    weights by 0.02–0.03 nats on mixed text, and on notebooks no system was trained on.
+    Ensembling of the same experts gives a larger share: the fixed mixture beats the best
+    single expert by 0.09–0.17. So routing is about 15–25% of the total gain.
+  - **The margins are just above the threshold**, and this run is a deviation chosen after
+    the contaminated run failed. It deserves less weight than a result pre-registered in
+    full; the paper must report both runs.
+  - The training math repeats about 7 times. The gate trained on it does not overfit
+    measurably: it is better than the fixed mixture on held-out math.
+  - **Lesson for the paper:** a gate trained on data that an expert has memorised learns
+    to trust that expert where it will not help. Gate training data must be unseen by
+    every expert, which pretrained models make hard to guarantee.

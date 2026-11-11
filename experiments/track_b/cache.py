@@ -2,6 +2,7 @@
 
     python experiments/track_b/cache.py --expert base   # Qwen/Qwen2.5-0.5B
     python experiments/track_b/cache.py --expert coder  # Qwen/Qwen2.5-Coder-0.5B
+    python experiments/track_b/cache.py --expert math --step 2 --bs 2   # Qwen/Qwen2.5-Math-1.5B
 
 Every file (data.py) is cut into non-overlapping windows of 513 tokens (512 inputs and their
 next tokens). For each window and input position the expert's
@@ -24,9 +25,13 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from experiments.track_b.data import OUT  # noqa: E402
 
-EXPERTS = {"base": "Qwen/Qwen2.5-0.5B", "coder": "Qwen/Qwen2.5-Coder-0.5B"}
+EXPERTS = {"base": "Qwen/Qwen2.5-0.5B", "coder": "Qwen/Qwen2.5-Coder-0.5B", "math": "Qwen/Qwen2.5-Math-1.5B"}
 FILES = ["mixed_train", "prose_val", "code_val", "mixed_blank_val", "mixed_long_val", "mixed_inline_val",
          "mixed_marked_val", "notebooks_val"]
+FILES2 = ["m3_train", "prose_val", "code_val", "math_val", "m3_blank_val", "m3_long_val", "m3_inline_val",
+          "m3_marked_val", "notebooks_val"]        # step 2 (+ math); the first file trains the gate
+FILES3 = ["m3c_train", "prose_val", "code_val", "mathc_val", "m3c_blank_val", "m3c_long_val", "m3c_inline_val",
+          "m3c_marked_val", "notebooks_val"]       # step 3 (+ math, GSM8K test halves)
 CTX = 512
 CACHE = os.path.join(OUT, "cache")
 
@@ -67,14 +72,17 @@ def main():
     from transformers import AutoModelForCausalLM
     ap = argparse.ArgumentParser()
     ap.add_argument("--expert", required=True, choices=list(EXPERTS))
-    ap.add_argument("--files", nargs="*", default=FILES)
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3])
+    ap.add_argument("--files", nargs="*")
+    ap.add_argument("--bs", type=int, default=4)
     a = ap.parse_args()
+    a.files = a.files or {1: FILES, 2: FILES2, 3: FILES3}[a.step]
     os.makedirs(os.path.join(CACHE, a.expert), exist_ok=True)
     model = AutoModelForCausalLM.from_pretrained(EXPERTS[a.expert], dtype=torch.bfloat16).cuda().eval()
     log = {}
     for f in a.files:
         out = os.path.join(CACHE, a.expert, f)
-        if os.path.exists(out + ".mx.npy"):
+        if os.path.exists(out + ".done"):
             print(f"{f}: cached", flush=True)
             continue
         X = windows(f)
@@ -82,8 +90,9 @@ def main():
         if not os.path.exists(xp):
             np.save(xp, X.astype(np.int32))
         t0 = time.time()
-        loss = run(model, X, out)
+        loss = run(model, X, out, bs=a.bs)
         dt = time.time() - t0
+        open(out + ".done", "w").write("ok")            # only complete files count as cached
         log[f] = {"windows": len(X), "loss": loss, "seconds": round(dt), "tok_per_s": round(len(X) * CTX / dt)}
         print(f"{f}: {json.dumps(log[f])}", flush=True)
     path = os.path.join(CACHE, a.expert, "log.json")

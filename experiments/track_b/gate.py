@@ -1,22 +1,27 @@
 """Track B: the Track C confidence gate over cached pretrained experts; training and evaluation.
 
-    python experiments/track_b/gate.py --name b_gate --experts base coder [--seed 0]
+    python experiments/track_b/gate.py --name b_gate_s0 --experts base coder [--seed 0]
+    python experiments/track_b/gate.py --name b3_gate_s0 --experts base coder math --step 2
 
-Training: mixed_train windows (cache.py), probability mixing, no routing labels; 3 epochs,
-batches of 8 windows, AdamW lr 1e-3 (cosine), weight decay 0.01. The gate is Track C's
-(gate.Gate with conf=True): every expert's hidden state and its 32-token causal mean, after
-a LayerNorm, plus each expert's entropy and largest log-probability divided by log V.
+Training: the step's training file (mixed_train, or m3_train for step 2) as cached windows
+(cache.py), probability mixing, no routing labels; 3 epochs, batches of 8 windows, AdamW lr
+1e-3 (cosine), weight decay 0.01. The gate is Track C's confidence gate (gate.Gate with
+conf=True), written here for experts of different widths: every expert's hidden state and
+its 32-token causal mean, after one LayerNorm, plus each expert's entropy and largest
+log-probability divided by log V, into a 256-unit MLP. With two experts of width 896 its
+parameters are those of gate.Gate, so step-1 checkpoints load unchanged.
 
 Evaluation, on every validation file: mean next-token loss of each expert alone, the gate,
 the per-token oracle (the best expert for each token in hindsight) and, where tokens are
-labelled, the label oracle (prose / markdown -> the first expert, code -> the second), each
-also split by label; the gate's mean weight on each expert by label. Control (added after
-the pre-registered criteria were evaluated): a constant mixture, the fixed expert weights
-that minimise the loss on mixed_train (grid of 101 values per weight, two experts), so the
-gain of the gate over plain ensembling can be read off.
+labelled, the label oracle (label k -> expert k: prose -> base, code -> coder, math ->
+math), each also split by label; the gate's mean weight on each expert by label. Control
+(added in step 1 after its pre-registered criteria were evaluated; pre-registered for step
+2): the constant mixture, the fixed expert weights that minimise the loss on the training
+file (two experts: 101-point grid; three: simplex grid with step 0.02).
 Writes checkpoints/track_b/<name>.pt and results/track_b/<name>.json.
 """
 import argparse
+import itertools
 import math
 import os
 import sys
@@ -24,15 +29,24 @@ import time
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from experiments.common import ROOT, save  # noqa: E402
-from experiments.track_b.cache import CACHE, CTX, FILES  # noqa: E402
-from experiments.track_b.data import OUT  # noqa: E402
-from experiments.track_c.gate import Gate  # noqa: E402
+from experiments.track_b.cache import CACHE, CTX, FILES, FILES2, FILES3  # noqa: E402
+from experiments.track_b.data import OUT, TYPES  # noqa: E402
 
 CKPT = os.path.join(ROOT, "checkpoints", "track_b")
 LOGV = math.log(151936)
+
+
+class GateB(nn.Module):
+    def __init__(self, dims, window=32, hidden=256):
+        super().__init__()
+        self.window = window
+        n_h = 2 * sum(dims)
+        self.ln = nn.LayerNorm(n_h)
+        self.net = nn.Sequential(nn.Linear(n_h + 2 * len(dims), hidden), nn.GELU(), nn.Linear(hidden, len(dims)))
 
 
 def load(expert, f):
@@ -58,7 +72,7 @@ def batch(caches, idx):
 
 
 def gate_logw(gate, hs, cf):
-    """log lambda (B, T, E): Gate.forward in conf mode, with precomputed confidence features."""
+    """log lambda (B, T, E): Track C's Gate.forward in conf mode, with precomputed confidence features."""
     h = torch.cat(hs, dim=-1)
     c = torch.cumsum(h, dim=1)
     w = gate.window
@@ -68,12 +82,12 @@ def gate_logw(gate, hs, cf):
     return torch.log_softmax(z, dim=-1)
 
 
-def train(a, experts, d):
+def train(a, experts, dims, train_file):
     torch.manual_seed(a.seed)
     rng = np.random.default_rng(a.seed)
-    caches = [load(e, "mixed_train") for e in experts]
+    caches = [load(e, train_file) for e in experts]
     W = caches[0]["tlp"].shape[0]
-    gate = Gate(len(experts), d, window=32, conf=True).cuda()
+    gate = GateB(dims).cuda()
     opt = torch.optim.AdamW(gate.parameters(), lr=a.lr, weight_decay=0.01)
     steps = a.epochs * (W // a.bs)
     t0, run, curve = time.time(), 0.0, []
@@ -93,23 +107,29 @@ def train(a, experts, d):
             curve.append({"step": step + 1, "loss": run})
             print(f"  step {step + 1}/{steps} loss {run:.4f} ({time.time() - t0:.0f}s)", flush=True)
     return gate, {"steps": steps, "tokens": steps * a.bs * CTX, "seconds": round(time.time() - t0), "curve": curve,
-                  "gate_params": sum(p.numel() for p in gate.parameters())}
+                  "gate_params": sum(p.numel() for p in gate.parameters()), "train_file": train_file}
 
 
-def constant_weights(experts):
-    t = torch.stack([torch.from_numpy(np.array(load(e, "mixed_train")["tlp"])) for e in experts], -1)
-    assert len(experts) == 2
-    grid = torch.linspace(0, 1, 101)
-    loss = [float(-torch.logsumexp(torch.log(torch.stack([1 - w, w]).clamp_min(1e-12)) + t, -1).mean()) for w in grid]
-    w = float(grid[int(np.argmin(loss))])
-    return torch.log(torch.tensor([1 - w, w]).clamp_min(1e-12))
+def constant_weights(experts, train_file):
+    t = torch.stack([torch.from_numpy(np.array(load(e, train_file)["tlp"])) for e in experts], -1).cuda()
+    if len(experts) == 2:
+        grid = [torch.tensor([1 - w, w]) for w in torch.linspace(0, 1, 101)]
+    else:
+        k = 50                                          # simplex grid, step 0.02
+        grid = [torch.tensor(c, dtype=torch.float32) / k for c in itertools.product(range(k + 1), repeat=len(experts))
+                if sum(c) == k]
+    best, wbest = float("inf"), None
+    for w in grid:
+        loss = float(-torch.logsumexp(torch.log(w.clamp_min(1e-12)).cuda() + t, -1).mean())
+        if loss < best:
+            best, wbest = loss, w
+    return torch.log(wbest.clamp_min(1e-12))
 
 
 @torch.no_grad()
-def evaluate(gate, experts):
+def evaluate(gate, experts, files, const):
     out = {}
-    const = constant_weights(experts)
-    for f in FILES[1:]:
+    for f in files:
         caches = [load(e, f) for e in experts]
         W = caches[0]["tlp"].shape[0]
         lab = labels(f, W)
@@ -125,12 +145,14 @@ def evaluate(gate, experts):
         sysl["oracle_token"] = -tlp.amax(-1)
         if lab is not None:
             L = torch.from_numpy(lab.astype(np.int64))
-            sysl["oracle_label"] = -tlp.gather(-1, L.unsqueeze(-1)).squeeze(-1)
+            sysl["oracle_label"] = -tlp.gather(-1, L.clamp(max=len(experts) - 1).unsqueeze(-1)).squeeze(-1)
         r = {"tokens": int(W * CTX), "loss": {k: float(v.mean()) for k, v in sysl.items()}}
         lam = logw.exp()
         if lab is not None:
-            for t, nm in enumerate(["prose", "code"]):
+            for t, nm in enumerate(TYPES):
                 m = L == t
+                if not m.any():
+                    continue
                 r[f"loss_{nm}"] = {k: float(v[m].mean()) for k, v in sysl.items()}
                 r[f"weight_{nm}"] = {e: float(lam[..., k][m].mean()) for k, e in enumerate(experts)}
                 r[f"share_{nm}"] = float(m.float().mean())
@@ -145,26 +167,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
     ap.add_argument("--experts", nargs="+", default=["base", "coder"])
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--bs", type=int, default=8)
     ap.add_argument("--lr", type=float, default=1e-3)
     a = ap.parse_args()
+    files = {1: FILES, 2: FILES2, 3: FILES3}[a.step]
     os.makedirs(CKPT, exist_ok=True)
-    d = load(a.experts[0], "mixed_train")["h"].shape[-1]
+    dims = [load(e, files[1])["h"].shape[-1] for e in a.experts]
     path = os.path.join(CKPT, f"{a.name}.pt")
     if os.path.exists(path):
         ck = torch.load(path, map_location="cuda", weights_only=False)
-        gate = Gate(len(a.experts), d, window=32, conf=True).cuda()
+        gate = GateB(dims).cuda()
         gate.load_state_dict(ck["gate"])
         info = ck["info"]
     else:
-        gate, info = train(a, a.experts, d)
-        torch.save({"gate": gate.state_dict(), "experts": a.experts, "d": d, "info": info}, path)
+        gate, info = train(a, a.experts, dims, files[0])
+        torch.save({"gate": gate.state_dict(), "experts": a.experts, "dims": dims, "info": info}, path)
     gate.eval()
-    res = evaluate(gate, a.experts)
-    save("track_b", a.name, {"experts": a.experts, "train": info, "eval": res,
-                             "constant_weights": constant_weights(a.experts).exp().tolist()}, seed=a.seed)
+    const = constant_weights(a.experts, files[0])
+    res = evaluate(gate, a.experts, files[1:], const)
+    save("track_b", a.name, {"experts": a.experts, "step": a.step, "train": info, "eval": res,
+                             "constant_weights": const.exp().tolist()}, seed=a.seed)
 
 
 if __name__ == "__main__":
