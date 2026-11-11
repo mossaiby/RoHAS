@@ -1,0 +1,357 @@
+{
+ "meta": {
+  "git_commit": "b0876c8517c93cde45b28102d4195d4a39c142fd",
+  "git_dirty": true,
+  "timestamp": "2026-11-11T02:38:06",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1"
+ },
+ "data": {
+  "scan": {
+   "lang_val": {
+    "tokens": 4900864,
+    "windows": 9572,
+    "counts": {
+     "none": 4900864,
+     "true_pred": 0,
+     "false_pred": 0,
+     "true_veto": 0,
+     "false_veto": 0
+    },
+    "windows_with_false": 0
+   },
+   "facts_val": {
+    "tokens": 257024,
+    "windows": 502,
+    "counts": {
+     "none": 257024,
+     "true_pred": 0,
+     "false_pred": 0,
+     "true_veto": 0,
+     "false_veto": 0
+    },
+    "windows_with_false": 0
+   },
+   "math_val": {
+    "tokens": 1888256,
+    "windows": 3688,
+    "counts": {
+     "none": 1363235,
+     "true_pred": 262265,
+     "false_pred": 0,
+     "true_veto": 262756,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 28.63140106201172,
+      "false_pred": 0.0,
+      "true_veto": 14249.0029296875,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 28.63253402709961,
+      "false_pred": 0.0,
+      "true_veto": 14259.55078125,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 1849.136962890625,
+      "false_pred": 0.0,
+      "true_veto": 14319.45703125,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 14385,
+     "false_pred": 0,
+     "true_veto": 14491,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": -1820.5055618286133,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": -1820.5044288635254
+    },
+    "false_cost_nats_per_token": 0.0
+   },
+   "code_val": {
+    "tokens": 3823616,
+    "windows": 7468,
+    "counts": {
+     "none": 3820922,
+     "true_pred": 0,
+     "false_pred": 0,
+     "true_veto": 2694,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 0.0,
+      "false_pred": 0.0,
+      "true_veto": 1320.99169921875,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 0.0,
+      "false_pred": 0.0,
+      "true_veto": 1321.432373046875,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 0.0,
+      "false_pred": 0.0,
+      "true_veto": 1320.0302734375,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 0,
+     "false_pred": 0,
+     "true_veto": 994,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": 0.0,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": 0.0
+    },
+    "false_cost_nats_per_token": 0.0
+   },
+   "mixed_val": {
+    "tokens": 499712,
+    "windows": 976,
+    "counts": {
+     "none": 471287,
+     "true_pred": 14128,
+     "false_pred": 0,
+     "true_veto": 14297,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 5.644455432891846,
+      "false_pred": 0.0,
+      "true_veto": 3321.225830078125,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 5.644746780395508,
+      "false_pred": 0.0,
+      "true_veto": 3323.3017578125,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 381.94647216796875,
+      "false_pred": 0.0,
+      "true_veto": 3317.7734375,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 3359,
+     "false_pred": 0,
+     "true_veto": 3390,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": -376.3020167350769,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": -376.30172538757324
+    },
+    "false_cost_nats_per_token": 0.0
+   },
+   "mixed_long_val": {
+    "tokens": 500224,
+    "windows": 977,
+    "counts": {
+     "none": 472503,
+     "true_pred": 13702,
+     "false_pred": 0,
+     "true_veto": 14019,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 8.580488204956055,
+      "false_pred": 0.0,
+      "true_veto": 4177.51953125,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 8.580839157104492,
+      "false_pred": 0.0,
+      "true_veto": 4181.693359375,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 559.3386840820312,
+      "false_pred": 0.0,
+      "true_veto": 4191.6865234375,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 4339,
+     "false_pred": 0,
+     "true_veto": 4389,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": -550.7581958770752,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": -550.7578449249268
+    },
+    "false_cost_nats_per_token": 0.0
+   },
+   "mixed_inline_val": {
+    "tokens": 499712,
+    "windows": 976,
+    "counts": {
+     "none": 465306,
+     "true_pred": 17097,
+     "false_pred": 0,
+     "true_veto": 17309,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 13.056998252868652,
+      "false_pred": 0.0,
+      "true_veto": 7468.037109375,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 13.057236671447754,
+      "false_pred": 0.0,
+      "true_veto": 7501.912109375,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 1222.6787109375,
+      "false_pred": 0.0,
+      "true_veto": 7806.30224609375,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 3301,
+     "false_pred": 0,
+     "true_veto": 3366,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": -1209.6217126846313,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": -1209.6214742660522
+    },
+    "false_cost_nats_per_token": 0.0
+   },
+   "mixed_marked_val": {
+    "tokens": 499712,
+    "windows": 976,
+    "counts": {
+     "none": 469928,
+     "true_pred": 14805,
+     "false_pred": 0,
+     "true_veto": 14979,
+     "false_veto": 0
+    },
+    "windows_with_false": 0,
+    "loss_sum": {
+     "atom": {
+      "true_pred": 13.298287391662598,
+      "false_pred": 0.0,
+      "true_veto": 5649.1240234375,
+      "false_veto": 0.0
+     },
+     "atom_noveto": {
+      "true_pred": 13.298553466796875,
+      "false_pred": 0.0,
+      "true_veto": 5663.90380859375,
+      "false_veto": 0.0
+     },
+     "conf": {
+      "true_pred": 1258.034912109375,
+      "false_pred": 0.0,
+      "true_veto": 5809.8515625,
+      "false_veto": 0.0
+     }
+    },
+    "n_scored": {
+     "true_pred": 3584,
+     "false_pred": 0,
+     "true_veto": 3627,
+     "false_veto": 0
+    },
+    "extra_nats_vs_conf": {
+     "atom/false_pred": 0.0,
+     "atom/false_veto": 0.0,
+     "atom/true_pred": -1244.7366247177124,
+     "atom_noveto/false_pred": 0.0,
+     "atom_noveto/false_veto": 0.0,
+     "atom_noveto/true_pred": -1244.7363586425781
+    },
+    "false_cost_nats_per_token": 0.0
+   }
+  },
+  "stress": {
+   "nats_per_item": {
+    "atom": {
+     "correct": 0.7917519136890769,
+     "wrong": 15.893108189105988,
+     "sign": 52.14212153434753
+    },
+    "atom_noveto": {
+     "correct": 0.8135916216671467,
+     "wrong": 15.540010375976562,
+     "sign": 29.183724191784858
+    },
+    "conf": {
+     "correct": 2.7927523950487374,
+     "wrong": 14.06148790717125,
+     "sign": 31.54014035522938
+    },
+    "mono_s": {
+     "correct": 6.237032497227192,
+     "wrong": 11.259720332622528,
+     "sign": 16.76995482325554
+    }
+   },
+   "n_per_kind": 200,
+   "example": {
+    "correct": "Sam wrote 297-95=202 on the board.",
+    "wrong": "Ben wrote 685+597=1182 on the board.",
+    "sign": "Zoe wrote 434-967=533 on the board."
+   }
+  }
+ },
+ "macros": {}
+}

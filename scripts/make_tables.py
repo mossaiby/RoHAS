@@ -313,6 +313,21 @@ def track_c_macros(res):
             for i, n in enumerate(["PlusSixteen", "PlusThirtyTwo", "MinusThirtyTwo", "TimesEight", "Word",
                                    "CtxStory", "CtxBio", "CtxCode", "CtxBlank", "CtxInline", "CtxAll"]):
                 out[("track_c", f"{key}{n}")] = f"{cells[i]:.0f}"
+    ft = res.get("track_c/false_triggers", {}).get("data", {})
+    if "scan" in ft:
+        sc = ft["scan"]
+        out[("track_c", "FalseScanTokens")] = f"{sum(v['tokens'] for v in sc.values()) / 1e6:.1f}M"
+        out[("track_c", "FalseScanCodeTokens")] = f"{sc['code_val']['tokens'] / 1e6:.1f}M"
+        out[("track_c", "FalseClaims")] = str(sum(v["counts"]["false_pred"] + v["counts"]["false_veto"]
+                                                for v in sc.values()))
+        out[("track_c", "CodeVetoes")] = f"{sc['code_val']['counts']['true_veto']:,}".replace(",", "{,}")
+        out[("track_c", "CodePredictions")] = str(sc["code_val"]["counts"]["true_pred"] +
+                                                  sc["code_val"]["counts"]["false_pred"])
+    if "stress" in ft:
+        cap = {"atom": "Atom", "atom_noveto": "NoVeto", "conf": "Conf", "mono_s": "MonoS"}
+        for k, v in ft["stress"]["nats_per_item"].items():
+            for kind, x in v.items():
+                put(f"Stress{cap[k]}{kind.capitalize()}", x, lambda z: f"{z:.1f}")
     a = ev(res, "main_ctxv20", "gate:main_ctxv20_gate_atom:prob")
     if a:
         put("CircuitLambdaActive", a["routing"]["circuit_lambda_active"], fmt2)

@@ -435,8 +435,24 @@ the mixed documents, joined by blank lines; the inline join is new to every syst
 after ``='' the model writes digits itself. The gated system with the circuit is exact on every
 item, for each of three expert seeds. The tool's trigger is learned from where calls appear
 in its training data. The circuit decides for itself where it applies, and the gate learns from
-confidence alone when to trust it. The circuit's rule fires wherever an equation appears,
-including code where ``='' may be assignment; we have not measured false triggers of that kind.
+confidence alone when to trust it.
+
+\paragraph{False triggers.} The circuit's rule fires wherever an equation appears, so it can be
+wrong about text: its predicted digit may not be the next token, or the text may contain a token
+it vetoes. On all held-out text (esTrackCFalseScanTokens{} tokens: stories, biographies,
+math, Python code and the four mixed formats) this happens esTrackCFalseClaims{} times. In
+esTrackCFalseScanCodeTokens{} tokens of code the circuit never predicts
+(esTrackCCodePredictions{} predictions), and the text respects all
+esTrackCCodeVetoes{} of its vetoes there. The cost appears when text states wrong
+arithmetic, as in a quoted mistake. Over the stated result, a correct statement costs
+esTrackCStressAtomCorrect{} nats with the circuit, against esTrackCStressConfCorrect{}
+without it and esTrackCStressMonoSCorrect{} for mono\_s. A result that is off by a small
+amount costs esTrackCStressAtomWrong{}, esTrackCStressConfWrong{} and
+esTrackCStressMonoSWrong{}. A negative result written without its minus sign (e.g.
+	exttt{12-20=8}) costs esTrackCStressAtomSign{} nats with the circuit, of which the veto on
+``='' contributes the difference to esTrackCStressNoVetoSign{} without vetoes. A system that
+must model erroneous text would need softer vetoes; ours encodes that stated arithmetic is
+correct.
 \begin{table}[t]
 \centering\small
 \caption{A calculator tool versus the circuit under the gate: percentage of exact answers.

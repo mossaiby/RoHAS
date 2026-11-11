@@ -488,5 +488,31 @@ standard alternative of a model trained to call a calculator (Toolformer-style)?
     from where calls appear in training; the circuit's applicability is decided by the
     circuit itself and the gate learns to trust it from confidence alone.
   - Caveat: the circuit applies wherever its pattern appears, so an equation-like string in
-    code (where "=" may be assignment) would also trigger it. False triggers of this kind
-    have not been measured yet.
+    code (where "=" may be assignment) would also trigger it. Measured below (false
+    triggers): none on held-out text, but wrong stated arithmetic is penalised.
+
+### Track C circuit false triggers (`false_triggers.py`)
+
+- **Held-out text, 12.9M tokens** (lang, facts, math, code val; four mixed formats), in
+  512-token windows:
+  - No false prediction and no violated veto anywhere.
+  - Code (3.8M tokens of Python): no prediction at all ("==" is one token, and digit
+    equations followed by "=" do not occur). 2,694 vetoes, all respected.
+  - Lang and facts: the circuit never fires. Math: 262k predictions, all correct.
+- **Stress test**, 200 items per kind, "<kid> wrote <eq>=<result> on the board.", nats over
+  "=" and the stated result:
+
+  | System | Correct | Wrong value | Missing minus |
+  |---|---|---|---|
+  | atom gate | 0.8 | 15.9 | 52.1 |
+  | atom gate, vetoes off | 0.8 | 15.5 | 29.2 |
+  | conf gate (no circuit) | 2.8 | 14.1 | 31.5 |
+  | mono_s | 6.2 | 11.3 | 16.8 |
+
+  - The circuit's prediction costs little on wrong text (+1.8 over the conf gate), because
+    the gate's math expert already expects the right answer.
+  - The veto is the expensive part: on a missing minus, "=" is vetoed (-30 nats), +20.6 over
+    the conf gate.
+- **For the paper:** zero false triggers on natural held-out text, including code; the
+  system encodes that stated arithmetic is correct, so modelling erroneous text would need
+  softer vetoes.
