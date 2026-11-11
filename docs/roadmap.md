@@ -793,3 +793,51 @@ problems are 100% for every refitted gate. Losses change by at most 0.0047 nats 
 on math for main_ctxv20 seed 1); all other changes are ≤ 0.002. The head's output changes by
 ≤ 0.0001 over the last 5,000 steps. The paper keeps the jointly trained gates in its tables and
 reports the refit as a follow-up (Section 5.4).
+
+### Track B, step 4: replacing a pretrained expert under the frozen gate (pre-registered 2026-11-12, before any outputs)
+
+H2 with pretrained experts: replace one expert by another and leave the gate as it is.
+
+- **Swap:** the prose expert Qwen2.5-0.5B is replaced by Qwen2.5-0.5B-Instruct (same
+  architecture and width, further trained for chat), as an expert would be replaced by a newer
+  version. Coder is unchanged. The step-1 gates b_gate_s0..s2 are used frozen, with the new
+  expert's outputs in the old one's slot.
+- **Data:** prose_val, code_val, notebooks_val, mixed_blank_val (the gate's training format)
+  and mixed_inline_val (held out). Disk does not allow hidden-state caches of all of
+  mixed_train for three experts, so the reference gates train on its first 1,302 windows (one
+  third, mixed_sub_train) for 9 epochs, the same number of updates as the step-1 gates.
+- **Systems** (3 seeds each):
+  - orig: frozen step-1 gate over base + Coder (the system before the swap);
+  - swap: the same frozen gate over Instruct + Coder;
+  - ref: a gate retrained on mixed_sub_train over Instruct + Coder (what retraining would buy);
+  - check: a gate retrained on mixed_sub_train over base + Coder, to show that the shorter
+    training file gives a gate as good as the step-1 gate.
+  Plus each expert alone and the fixed mixture.
+- **Criteria:**
+  - S1 (no retraining needed): on every evaluation set, swap is within 0.01 nats of ref
+    (means over seeds).
+  - S2 (only the replaced type changes): on code_val, swap is within 0.01 nats of orig.
+  - S3 (the new expert is used): on every set, swap beats both of its experts alone.
+  - Validity: check within 0.01 of orig on every set; otherwise ref is not a fair reference
+    and S1 is reported as not tested.
+- **Caveat stated in advance:** if Instruct and base differ on prose_val by less than 0.02
+  nats, the swap is too small to say much, and we will say so.
+
+**Result (2026-11-12; results/track_b/swap_*.json).** The test ran under the original package
+versions (torch 2.6.0, transformers 5.22.1; they had been downgraded on this machine in the
+meantime and were reinstalled). The recomputed base and Coder outputs are bit-identical to the
+earlier caches. The swap is not small: Instruct is 0.060 nats worse than base on prose_val.
+
+- Validity check **fails**: gates retrained on the third of mixed_train (check) are 0.009–0.016
+  worse than the step-1 gates on the same pair (> 0.01 on four of five sets). So, as
+  pre-registered, ref is not a fair reference and **S1 is not tested**. For the record, the
+  frozen gate is better than ref on four sets (by 0.004–0.009) and worse by 0.0035 on inline
+  (worst seed 0.0046).
+- S2 **holds**: code_val 1.4696 after the swap vs 1.4608 before (+0.0088 < 0.01).
+- S3 **holds**: after the swap the gate beats both of its experts alone on every set, by
+  0.004 (notebooks) to 0.064 (inline).
+- Not pre-registered, reported: the fixed mixture refitted for the new pair is within
+  −0.002…+0.013 of the frozen gate (better than it on prose, code, notebooks and inline), as
+  in step 1, where the two experts' gain was almost all ensembling. The gate's weights follow
+  the replacement: on prose segments of the mixed sets the prose expert's weight is 0.67 / 0.66
+  after the swap vs 0.65 / 0.63 before.

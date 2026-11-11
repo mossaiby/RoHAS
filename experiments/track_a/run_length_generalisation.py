@@ -81,7 +81,7 @@ def run_llm(model_key, its, batch=16):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     name = MODELS[model_key]
     tok = AutoTokenizer.from_pretrained(name, local_files_only=True, padding_side="left")
-    model = AutoModelForCausalLM.from_pretrained(name, local_files_only=True, dtype=torch.float16).to("cuda")
+    model = AutoModelForCausalLM.from_pretrained(name, local_files_only=True, torch_dtype=torch.float16).to("cuda")
     model.eval()
     preds = []
     for i in range(0, len(its), batch):

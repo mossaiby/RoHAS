@@ -551,6 +551,61 @@ def track_b_macros(res):
     return out
 
 
+B_SWAP_SETS = [("prose_val", "Prose"), ("code_val", "Code"), ("mixed_blank_val", "Mixed, blank"),
+               ("mixed_inline_val", "Mixed, inline"), ("notebooks_val", "Notebooks")]
+
+
+def swap_runs(res):
+    runs = {k: b_runs(res, f"swap_{k}") for k in ("orig", "frozen", "ref", "check")}
+    return runs if all(len(v) == 3 for v in runs.values()) else None
+
+
+def table_track_b_swap(res):
+    R = swap_runs(res)
+    if not R:
+        return "% no results\n"
+    rows = []
+    for f, label in B_SWAP_SETS:
+        Lo, Ln = R["orig"][0]["eval"][f]["loss"], R["frozen"][0]["eval"][f]["loss"]
+        vals = [Lo["base"], Ln["base_inst"], Lo["coder"], b_gate(R["orig"], f), b_gate(R["frozen"], f),
+                Ln["constant"], b_gate(R["ref"], f), b_gate(R["check"], f)]
+        rows.append(f"{label} & " + " & ".join(fmt3(v) for v in vals) + r" \\")
+    head = (r"& \multicolumn{3}{c}{Experts alone} & \multicolumn{3}{c}{Frozen step-1 gate} & "
+            r"\multicolumn{2}{c}{Retrained, a third} \\" "\n"
+            r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-9}" "\n"
+            r"Data & Base & Instruct & Coder & Before & After & Fixed mix & After & Before")
+    return tabular("l" + "r" * 8, head, rows)
+
+
+def track_b_swap_macros(res):
+    R = swap_runs(res)
+    out = {}
+    if not R:
+        return out
+
+    def put(name, v, f=fmt3):
+        out[("track_b", name)] = f(v)
+    sets = [f for f, _ in B_SWAP_SETS]
+    E = lambda k, f: R[k][0]["eval"][f]["loss"]  # noqa: E731
+    put("SwapProseExpertGap", E("frozen", "prose_val")["base_inst"] - E("orig", "prose_val")["base"])
+    put("SwapCodeChange", b_gate(R["frozen"], "code_val") - b_gate(R["orig"], "code_val"))
+    put("SwapProseChange", b_gate(R["frozen"], "prose_val") - b_gate(R["orig"], "prose_val"))
+    chk = [b_gate(R["check"], f) - b_gate(R["orig"], f) for f in sets]
+    put("SwapCheckMin", min(chk))
+    put("SwapCheckMax", max(chk))
+    s1 = [b_gate(R["frozen"], f) - b_gate(R["ref"], f) for f in sets]
+    put("SwapVsRefMin", -max(s1))
+    put("SwapVsRefMax", -min(s1))
+    put("SwapVsRefWorse", max(s1))
+    s3 = [min(E("frozen", f)[e] for e in ("base_inst", "coder")) - b_gate(R["frozen"], f) for f in sets]
+    put("SwapOverExpertMin", min(s3))
+    put("SwapOverExpertMax", max(s3))
+    cm = [b_gate(R["frozen"], f) - E("frozen", f)["constant"] for f in sets]
+    put("SwapConstGapMin", min(cm))
+    put("SwapConstGapMax", max(cm))
+    return out
+
+
 B_CIRC_SYS = [("base", "Base"), ("coder", "Coder"), ("gate", "Gate"), ("gate_circuit", "Gate + circuit")]
 
 
@@ -609,7 +664,7 @@ def track_b_circuit_macros(res):
 
 
 B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2),
-            ("track_b_circuit", table_track_b_circuit),
+            ("track_b_circuit", table_track_b_circuit), ("track_b_swap", table_track_b_swap),
             ("track_c_ablation", table_track_c_ablation)]
 
 
@@ -630,6 +685,7 @@ def derived_macros(res):
     out.update(track_c_macros(res))
     out.update(track_b_macros(res))
     out.update(track_b_circuit_macros(res))
+    out.update(track_b_swap_macros(res))
     return out
 
 

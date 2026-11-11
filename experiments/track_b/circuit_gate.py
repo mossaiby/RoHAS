@@ -146,7 +146,7 @@ def loss_eval(gate, circ, wb):
 class Live:
     def __init__(self, gate, circ, wb):
         from transformers import AutoModelForCausalLM
-        self.models = [AutoModelForCausalLM.from_pretrained(EXPERTS[e], dtype=torch.bfloat16).cuda().eval()
+        self.models = [AutoModelForCausalLM.from_pretrained(EXPERTS[e], torch_dtype=torch.bfloat16).cuda().eval()
                        for e in LM]
         self.gate, self.circ, self.wb = gate, circ, wb.cuda()
 

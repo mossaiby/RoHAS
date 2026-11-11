@@ -34,7 +34,7 @@ The experts are hand-weighted transformers in `circuits/`, with no training.
 | --- | --- | --- |
 | Table 1, correctness | `experiments/track_a/run_correctness.py` (`--suite exhaustive3` takes about 2.5 h on 15 workers) | `results/track_a/correctness.json` |
 | Table 2, length generalisation | `experiments/track_a/run_length_generalisation.py --systems compiled python`, then `--systems qwen0.5b qwen1.5b` | `results/track_a/length_generalisation.json` |
-| Tables 12-13, size and cost | `experiments/track_a/run_cost.py` (on an idle machine) | `results/track_a/cost.json` |
+| Tables 13-14, size and cost | `experiments/track_a/run_cost.py` (on an idle machine) | `results/track_a/cost.json` |
 
 ## Section 5: experts trained from scratch (Track C)
 
@@ -52,7 +52,7 @@ Data (written to `data/track_c/`, not in git): `experiments/track_c/data.py`, th
 | Calculator baseline (Table 6) | `tool_baseline.py` | `tool_heldout.json`, `tool_context.json` |
 | False triggers and wrong arithmetic | `false_triggers.py` | `false_triggers.json` |
 | Adding facts (Table 7) | `run_add_facts.py`, `run_ctxv_followup.py --only add eval` | `eval_*add_facts*.json` |
-| Ablations (Table 11) | the gate variants in `run_circuit.py` | `eval_main_circuit*.json` |
+| Ablations (Table 12) | the gate variants in `run_circuit.py` | `eval_main_circuit*.json` |
 
 All scripts are in `experiments/track_c/`; models train with `train.py`, gates with `gate.py`,
 and are evaluated with `evaluate.py` and `diag_mixed.py`.
@@ -70,3 +70,4 @@ the gates train on the cache.
 | Table 8, prose and code | `gate.py --name b_gate_s<seed> --experts base coder --seed <seed>` | `results/track_b/b_gate_s*.json` |
 | Table 9, adding a math expert | `gate.py --experts base coder math --step 2` (contaminated run) and `--step 3` (clean run); `segment_losses.py` | `b3_gate_s*.json`, `b3c_gate_s*.json`, `segment_losses.json` |
 | Table 10, circuit under the pretrained gate | `data_circuit.py`, then `circuit_gate.py` (live decoding, about 1.5 h) and `veto_scan.py` | `circuit_gate.json`, `veto_scan.json` |
+| Table 11, replacing an expert | `run_swap.py` (caches Qwen2.5-0.5B-Instruct, about 8 GB of hidden states in all) | `swap_{orig,frozen,ref,check}_s*.json` |

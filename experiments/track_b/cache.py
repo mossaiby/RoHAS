@@ -25,13 +25,16 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from experiments.track_b.data import OUT  # noqa: E402
 
-EXPERTS = {"base": "Qwen/Qwen2.5-0.5B", "coder": "Qwen/Qwen2.5-Coder-0.5B", "math": "Qwen/Qwen2.5-Math-1.5B"}
+EXPERTS = {"base": "Qwen/Qwen2.5-0.5B", "coder": "Qwen/Qwen2.5-Coder-0.5B", "math": "Qwen/Qwen2.5-Math-1.5B",
+           "base_inst": "Qwen/Qwen2.5-0.5B-Instruct"}             # step 4: the replacement prose expert
 FILES = ["mixed_train", "prose_val", "code_val", "mixed_blank_val", "mixed_long_val", "mixed_inline_val",
          "mixed_marked_val", "notebooks_val"]
 FILES2 = ["m3_train", "prose_val", "code_val", "math_val", "m3_blank_val", "m3_long_val", "m3_inline_val",
           "m3_marked_val", "notebooks_val"]        # step 2 (+ math); the first file trains the gate
 FILES3 = ["m3c_train", "prose_val", "code_val", "mathc_val", "m3c_blank_val", "m3c_long_val", "m3c_inline_val",
           "m3c_marked_val", "notebooks_val"]       # step 3 (+ math, GSM8K test halves)
+FILES4 = ["mixed_sub_train", "prose_val", "code_val", "notebooks_val", "mixed_blank_val",
+          "mixed_inline_val"]                       # step 4 (swap test); first third of mixed_train
 CTX = 512
 CACHE = os.path.join(OUT, "cache")
 
@@ -72,17 +75,18 @@ def main():
     from transformers import AutoModelForCausalLM
     ap = argparse.ArgumentParser()
     ap.add_argument("--expert", required=True, choices=list(EXPERTS))
-    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3])
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3, 4])
     ap.add_argument("--files", nargs="*")
+    ap.add_argument("--force", action="store_true", help="recompute files already cached (e.g. deleted hidden states)")
     ap.add_argument("--bs", type=int, default=4)
     a = ap.parse_args()
-    a.files = a.files or {1: FILES, 2: FILES2, 3: FILES3}[a.step]
+    a.files = a.files or {1: FILES, 2: FILES2, 3: FILES3, 4: FILES4}[a.step]
     os.makedirs(os.path.join(CACHE, a.expert), exist_ok=True)
-    model = AutoModelForCausalLM.from_pretrained(EXPERTS[a.expert], dtype=torch.bfloat16).cuda().eval()
+    model = AutoModelForCausalLM.from_pretrained(EXPERTS[a.expert], torch_dtype=torch.bfloat16).cuda().eval()
     log = {}
     for f in a.files:
         out = os.path.join(CACHE, a.expert, f)
-        if os.path.exists(out + ".done"):
+        if os.path.exists(out + ".done") and not a.force:
             print(f"{f}: cached", flush=True)
             continue
         X = windows(f)

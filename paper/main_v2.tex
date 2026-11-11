@@ -108,7 +108,8 @@ gate is exact where a calculator-calling model is not (Section~\ref{sec:scratch}
 (iv) Pretrained experts under the same gate, separating routing from ensembling, and a failure
 mode of label-free gating: an expert that has memorised the gate's training data is trusted
 where it does not help; and a compiled expert added to the frozen gate over pretrained
-models, which makes their arithmetic exact (Section~\ref{sec:pretrained}).
+models, which makes their arithmetic exact; and a replacement of one pretrained expert under the
+frozen gate (Section~\ref{sec:pretrained}).
 (v) Ablations of the gate design (Section~\ref{sec:ablations}).
 
 % =====================================================================================
@@ -755,14 +756,52 @@ operation and length).}
 {\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_b_circuit.tex}{\input{tables/track_b_circuit}}{\pending{table}}}
 \end{table}
 
+\subsection{Replacing an expert under the frozen gate}
+\label{sec:pretrained_swap}
+
+The last test of H2 replaces one pretrained expert by another and leaves the gate as it is. We
+replace the prose expert Qwen2.5-0.5B by Qwen2.5-0.5B-Instruct, the same model trained further
+for chat, as an expert might be replaced by a newer version. It has the same width, so its
+outputs go into the old expert's slot of the three frozen step-1 gates. The swap is not small:
+on prose the new expert is \resTrackBSwapProseExpertGap{} nats worse than the old one. Tests
+and criteria were fixed in advance: after the swap the code loss should move by at most 0.01
+nats (only the replaced type should change); the frozen gate should beat both of its experts
+alone; and it should be within 0.01 nats of a gate retrained for the new pair. Disk space for
+cached hidden states allowed retraining only on the first third of the gate's training
+documents, so we also required that a gate retrained on that third for the \emph{old} pair
+match the step-1 gate within 0.01 nats, or the last comparison would not count.
+
+Table~\ref{tab:pretrained_swap} gives the results. The code loss rises by
+\resTrackBSwapCodeChange{} nats and the prose loss by \resTrackBSwapProseChange{}, about half
+of the new expert's own loss increase on prose, and the frozen gate beats both of its experts on every
+set, by \resTrackBSwapOverExpertMin--\resTrackBSwapOverExpertMax{} nats. The third comparison
+was not tested: on a third of the documents the retrained gates are
+\resTrackBSwapCheckMin--\resTrackBSwapCheckMax{} nats worse than the step-1 gates, beyond the
+tolerance. For what it shows, the frozen gate is better than the gate retrained on that third
+on four sets and worse by \resTrackBSwapVsRefWorse{} on the fifth. As in
+Section~\ref{sec:pretrained_two}, a fixed mixture refitted for the new pair is about as good
+as the frozen gate (it is within \resTrackBSwapConstGapMin{} to \resTrackBSwapConstGapMax{}
+nats; positive values favour the mixture). With these two experts ensembling explains the
+gain, as before; the test shows that the frozen gate keeps working when an expert is
+replaced, not that it routes better.
+\begin{table}[t]
+\centering\small
+\caption{Replacing the prose expert Qwen2.5-0.5B (Base) by Qwen2.5-0.5B-Instruct under the
+frozen step-1 gate: loss in nats per token (gates: mean of three seeds). Before: the step-1
+system. After: the same gates with Instruct in Base's place. Fixed mix: one weight pair refitted
+for the new experts. The last two columns are gates retrained on a third of the gate's training
+documents, for the new and for the old pair.}
+\label{tab:pretrained_swap}
+{\setlength{\tabcolsep}{4pt}\IfFileExists{tables/track_b_swap.tex}{\input{tables/track_b_swap}}{\pending{table}}}
+\end{table}
+
 \paragraph{Limitations.} The experts are small (0.5B and 1.5B parameters) and from one model
 family, and apart from the arithmetic above we measure loss, not generated answers. The
 arithmetic in the circuit test is synthetic and the circuit's coverage is narrow: it acts only
 on an explicit equation. The repeated run with unseen math was decided after the
-pre-registered run had failed, and its margins are close to the threshold we set. We have not
-replaced one pretrained expert by another, a test of H2 that Section~\ref{sec:scratch_update}
-makes only with experts trained from scratch; adding the circuit with the gate frozen is the
-closest test here.
+pre-registered run had failed, and its margins are close to the threshold we set. The
+replacement test swaps one expert for a close relative of the same width, and its comparison
+with a retrained gate could not be made at the tolerance we set.
 
 % =====================================================================================
 \section{Ablations and cost}
@@ -832,7 +871,9 @@ varied formats during training, including in formats held out from all training.
 exposure they lose on mixed text, and the loss is not a routing failure: each expert reads
 foreign context badly. Updating one expert leaves the others unchanged, the gate needs no
 retraining, and the monolithic alternative pays on stories, code, mixed text and old facts,
-though not on math (H2). An exact expert
+though not on math (H2). With pretrained experts, replacing the prose expert under the frozen
+gate moves the code loss by less than a hundredth of a nat, and the gate still beats both of its
+experts; whether a retrained gate would do better we could not test at our tolerance. An exact expert
 can join the same mixture with no labels, and with the two-level gate and vetoes it is exact
 where a model trained to call a calculator is not. With pretrained experts the gate still beats
 the best single expert and the best fixed mixture, but most of the gain over a single expert is
@@ -872,7 +913,8 @@ repeated unary minus is not parsed, and division truncates.
 
 \paragraph{Future work.} A frozen backbone whose weights cannot be changed, with facts and tools
 added, revoked and removed through external experts, was part of our plan and is not in this
-paper. Other open steps are replacing one pretrained expert by another, generation benchmarks,
+paper. Other open steps are replacing pretrained experts by models of other widths or
+families, generation benchmarks,
 and compiled experts that act on less explicit cues than a written equation.
 
 \bibliographystyle{tmlr}
