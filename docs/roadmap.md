@@ -516,3 +516,73 @@ standard alternative of a model trained to call a calculator (Toolformer-style)?
 - **For the paper:** zero false triggers on natural held-out text, including code; the
   system encodes that stated arithmetic is correct, so modelling erroneous text would need
   softer vetoes.
+
+### Track B, step 1: language + code (pre-registered 2026-11-11, before any expert outputs were computed)
+
+The roadmap's go/no-go for Track B: two pretrained experts that share a tokenizer, combined
+by the Track C gate, must beat the better single expert on mixed text before more experts
+are added.
+
+- **Experts:** frozen and run in bf16: Qwen2.5-0.5B (base, "prose") and Qwen2.5-Coder-0.5B
+  ("code"). Same tokenizer and vocabulary (151,936 rows); Coder is a continued pre-training
+  of the base model on mostly code.
+- **Data** (`experiments/track_b/data.py`):
+  - prose: fineweb-edu (sample/100BT shard 000; row groups 0–99 train, 700–719 val);
+  - code: codeparrot-clean-valid with the Track C filters and repository split (97 / 3);
+  - mixed: documents of alternating prose and code segments in the Track C formats. The gate
+    trains on 2M tokens in the blank-line format only. Validation uses all four formats
+    (blank, long, inline, marked), from the validation pools;
+  - natural mixed (held out from all training): GitHub notebooks
+    (codeparrot/github-jupyter-text-code-pairs), markdown and the code cell after it,
+    joined by a blank line, consecutive pairs of one notebook in one document; tokens
+    labelled markdown or code.
+  - Each validation set is 300k tokens in 512-token windows.
+  - Contamination: both experts were likely pre-trained on web text and GitHub code like
+    these, so absolute losses are optimistic; the comparison is between systems.
+- **Gate:** the Track C confidence gate (hidden states and their 32-token causal mean, plus
+  entropy and largest log-probability per expert; probability mixing), trained without
+  routing labels on cached expert outputs. 3 epochs over the 2M tokens, lr 1e-3, seed 0.
+- **Systems:** base alone, Coder alone, the gate, a label oracle (the expert of each token's
+  segment type; mixed and notebook sets) and the per-token oracle (best expert per token
+  in hindsight).
+- **Criteria (go if all hold):**
+  - G1: the gate's loss is at least 0.01 nats below the better single expert on each of the
+    four synthetic mixed formats;
+  - G2: the same on the natural notebooks;
+  - G3: on pure prose and on pure code, the gate is within 0.02 nats of the better expert.
+- If Coder is better than the base model on prose too, G1 and G2 can still hold through
+  per-token mixing, but the margin is expected to be small. We report it whatever it is.
+- **Results** (`gate.py`, `results/track_b/b_gate_s{0,1,2}.json`):
+  - Caching: about 3,900 tokens/s per 0.5B expert on the RTX 3050 Ti (4.1M tokens each, about
+    17 min); cache 14 GB.
+  - Gate: 0.92M parameters, 67 s of training. Loss in nats per token, gate mean over 3 seeds
+    (sd ≤ 0.0013):
+
+    | Set | Base | Coder | Fixed 50/50 | Gate | Label oracle | Token oracle |
+    |---|---|---|---|---|---|---|
+    | prose | 2.766 | 2.837 | 2.747 | 2.743 | – | 2.583 |
+    | code | 1.538 | 1.480 | 1.464 | 1.461 | – | 1.348 |
+    | mixed blank | 2.743 | 2.744 | 2.673 | 2.663 | 2.706 | 2.509 |
+    | mixed long | 2.268 | 2.235 | 2.181 | 2.179 | 2.216 | 2.033 |
+    | mixed inline | 3.562 | 3.480 | 3.380 | 3.380 | 3.461 | 3.181 |
+    | mixed marked | 2.545 | 2.538 | 2.475 | 2.469 | 2.505 | 2.318 |
+    | notebooks | 1.986 | 1.891 | 1.876 | 1.873 | 1.938 | 1.735 |
+
+  - **Pre-registered criteria: all hold (go).** Margins over the better single expert:
+    G1 0.056–0.100 on the four mixed formats; G2 0.019 on notebooks (worst seed 0.018); G3
+    the gate is *better* than either expert on pure prose (by 0.023) and pure code (0.019).
+  - The gate also beats the label oracle everywhere: on notebooks Coder is better than the
+    base model on the markdown too (2.536 vs 2.653), and the gate puts 0.55 on Coder there.
+  - **Control (added after the criteria were evaluated): almost all of the gain is
+    ensembling.** A fixed 50/50 mixture (the best constant weights on mixed_train) is within
+    0.001–0.010 of the gate on every set. The gate's own contribution is 0.010 (blank),
+    0.007 (marked), 0.004 (prose), 0.003 (code, long, notebooks), 0.001 (inline). Its weights
+    are soft: about 0.65 / 0.35 toward the matching expert on mixed text, 0.66 / 0.34 on
+    prose and 0.28 / 0.72 on code.
+  - Reading: the two experts overlap heavily (Coder continues the base model's training), so
+    either expert is a fair fallback for the other and plain averaging already helps. With
+    such experts, token-level routing adds little. The Track C result, where routing
+    mattered, came from experts that are poor outside their own data.
+- **Next:** the routing claim needs experts that differ more. The planned next step adds
+  math (Qwen2.5-Math-1.5B in 4-bit) and the circuits, where one expert is far better on
+  some tokens; the constant mixture is now a standard control row.
