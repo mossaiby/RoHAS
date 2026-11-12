@@ -212,6 +212,7 @@ def table_track_c_arith(res):
 TOOL_SYSTEMS = [("mono\\_s", ["model:main_mono_s"]),
                 ("mono\\_s + calculator", ["tool:main_mono_s_calc"]),
                 ("mono\\_s + calculator, closing marker", ["tool:main_mono_s_calc_end"]),
+                ("\\quad + varied mixed text", ["tool:main_mono_s_calcv_end"]),
                 ("gate + circuit (worst of 3 expert seeds)",
                  [f"gate:main_ctxv20{s}_gate_atom:prob" for s in ("", "_e1", "_e2")])]
 
@@ -328,6 +329,7 @@ def track_c_macros(res):
         put("UpdOldRecall", e["facts_train_templates"]["all"])
         put("UpdNewRecall", e["facts_new_train_templates"]["all"])
     for key, specs in [("Tool", ["tool:main_mono_s_calc"]), ("ToolEnd", ["tool:main_mono_s_calc_end"]),
+                       ("ToolVar", ["tool:main_mono_s_calcv_end"]),
                        ("ToolMonoS", ["model:main_mono_s"]), ("ToolGate", TOOL_SYSTEMS[-1][1])]:
         cells = tool_cells(res, specs)
         if cells:
@@ -396,6 +398,7 @@ def track_c_macros(res):
     if tr("main_mono_m"):
         mm = tr("main_mono_m")
         out[("track_c", "MonoMMixedPct")] = f"{100 * mm['mix']['mixed']:.1f}"
+        out[("track_c", "MonoSMixedPct")] = f"{100 * tr('main_mono_s')['mix']['mixed']:.1f}"
         out[("track_c", "MonoMixedTokens")] = f"{mm['mix']['mixed'] * mm['tokens'] / 1e6:.0f}M"
     return out
 

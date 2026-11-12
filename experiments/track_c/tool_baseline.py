@@ -25,6 +25,12 @@ Toolformer's "-> result]", so the model resumes after a delimiter. Added after t
 whose format had no closing marker: there the model often kept writing digits after the
 inserted answer on long numbers.
 
+--varied (with --end): the variant main_mono_s_calcv_end. Its mixed data is mixedv_train,
+mixed documents from mixed_train's pools in the formats of the experts' varied context
+exposure (data_mixed_ood.VARIED), and the mixed share is raised to 0.2, the experts' exposure
+fraction (data mathcalce_train, mixedcalcve_train; diag tags with "_vend"). Added to answer
+the objection that the baseline is weak inside text only for lack of varied mixed text.
+
 The tool. When the model emits CALL, the tool parses the tokens right before it with the
 circuit expert's rule (<non-digit> a op b =, digits as single tokens), computes the answer
 with Python integers and inserts its tokens; then the model continues. The circuit expert and
@@ -112,6 +118,21 @@ def write_calc(tok, src, dst, max_tokens=None, end=""):
     labels.tofile(os.path.join(DATA, f"{dst}_labels.bin"))
     print(f"  {dst}: {len(ids):,} tokens, {n_eq:,} calls, {int((labels == 255).sum()):,} tool tokens "
           f"(from {len(arr):,} tokens of {src})", flush=True)
+
+
+def build_mixedv(tok):
+    """mixedv_train: mixed_train's pools (data.py), formats from data_mixed_ood.VARIED, 12M tokens."""
+    from experiments.track_c.data import code_files, stories
+    from experiments.track_c.data_mixed_ood import VARIED, build
+    lang, n = [], 0
+    for s in stories("train"):            # the story sample data.py used for mixed_train
+        lang.append(s)
+        n += len(s)
+        if n > 25e6:
+            break
+    pools = {"lang": lang, "people": json.load(open(os.path.join(DATA, "people.json")))["old"],
+             "code": [t for split, t in code_files() if split == "train"]}
+    build(tok, pools, VARIED, 12_000_000, seed=500, name="mixedv_train")
 
 
 # ---- the tool --------------------------------------------------------------------------
@@ -280,8 +301,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--end", action="store_true", help="the tool also inserts a closing marker (variant _end)")
+    ap.add_argument("--varied", action="store_true", help="with --end: varied-format mixed data, share 0.2")
     a = ap.parse_args()
+    assert a.end or not a.varied, "--varied is defined for the closing-marker variant"
     name, sfx, end = (NAME + "_end", "e", END) if a.end else (NAME, "", "")
+    if a.varied:
+        name = "main_mono_s_calcv_end"
     steps = a.only or ["data", "train", "eval", "context", "diag"]
     tok = tokenizer()
     systems = ["model:main_mono_s", f"tool:{name}"] + [f"gate:{g}:prob" for g in GATES]
@@ -290,10 +315,16 @@ def main():
             write_calc(tok, "math_train", f"mathcalc{sfx}_train", max_tokens=40_000_000, end=end)
         if not os.path.exists(os.path.join(DATA, f"mixedcalc{sfx}_train.bin")):
             write_calc(tok, "mixed_train", f"mixedcalc{sfx}_train", end=end)
+        if a.varied and not os.path.exists(os.path.join(DATA, "mixedcalcve_train.bin")):
+            if not os.path.exists(os.path.join(DATA, "mixedv_train.bin")):
+                build_mixedv(tok)
+            write_calc(tok, "mixedv_train", "mixedcalcve_train", end=end)
     if "train" in steps and not os.path.exists(os.path.join(CKPT, f"{name}.pt")):
         mono = json.load(open(os.path.join(ROOT, "results", "track_c", "train_main_mono_s.json")))["data"]["mix"]
         src = {"math": f"mathcalc{sfx}", "mixed": f"mixedcalc{sfx}"}
         mix = [f"{src.get(k, k)}={v}" for k, v in mono.items()]
+        if a.varied:
+            mix = ["lang=0.2", "facts=0.2", f"mathcalc{sfx}=0.2", "code=0.2", "mixedcalcve=0.2"]
         run([os.path.join(HERE, "train.py"), "--name", name, "--size", "s", "--init",
              os.path.join(CKPT, "main_mono_s.pt"), "--mix", *mix, "--own", "math", "--tokens", "50e6",
              "--micro", "16", "--batch-tokens", "8192", "--lr", "3e-4", "--evals", "4"])
@@ -307,7 +338,8 @@ def main():
         context(systems, tok)
     if "diag" in steps:
         for d in ["mixed_val"] + [f"mixed_{f}_val" for f in EVAL]:
-            tag = ("tool_baseline" if d == "mixed_val" else f"{d[6:-4]}_tool_baseline") + ("_end" if a.end else "")
+            tag = ("tool_baseline" if d == "mixed_val" else f"{d[6:-4]}_tool_baseline") + \
+                ("_vend" if a.varied else "_end" if a.end else "")
             run([os.path.join(HERE, "diag_mixed.py"), "--tag", tag, "--data", d, "--models", name])
 
 

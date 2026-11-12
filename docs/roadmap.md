@@ -841,3 +841,36 @@ earlier caches. The swap is not small: Instruct is 0.060 nats worse than base on
   in step 1, where the two experts' gain was almost all ensembling. The gate's weights follow
   the replacement: on prose segments of the mixed sets the prose expert's weight is 0.67 / 0.66
   after the swap vs 0.65 / 0.63 before.
+
+### Track C follow-up: the calculator baseline with varied-format mixed text (pre-registered 2026-11-12, before any data)
+
+Possible objection: the calculator baseline (main_mono_s_calc_end) is weak inside other text
+only because its mixed training data has one format (blank-line joins, 1.5% of its tokens),
+while the gated experts had varied-format context exposure (20% of their branch tokens).
+
+- **Data:** mixedv_train, 12M tokens of mixed documents built like mixed_train (same pools:
+  the training story sample, the stored people, training-split code, fresh math) but with each
+  document's format drawn from data_mixed_ood.VARIED (blank, long, para3: the formats of the
+  experts' exposure), annotated with calls and closing markers (mixedcalcve_train).
+- **Model:** main_mono_s_calcv_end: main_mono_s fine-tuned as main_mono_s_calc_end (50M
+  tokens, lr 3e-4, 8k-token batches, tool output out of the loss), but with the mixed share
+  raised to 0.2 (lang, facts, math, code 0.2 each), the experts' exposure fraction.
+- **Tests:** as before: held-out arithmetic and word problems, arithmetic inside other text
+  (tool_context: stories, biographies, code; blank and inline joins; + − ×; 4 and 16 digits),
+  mixed-text loss in four formats.
+- **No pass/fail for our system.** We report the result as it comes out. If the varied baseline
+  is exact (≥ 0.95) in every in-text cell, the paper's claim that the circuit under the gate is
+  exact where a calculator-calling model is not is withdrawn for text, and kept only where the
+  data still support it.
+
+**Result (2026-11-12; tool_heldout.json, tool_context.json, diag_mixed_*_tool_baseline_vend.json).**
+The objection is partly right. Varied mixed text makes the calculator baseline much stronger:
+held-out arithmetic 100% in every cell (up to 32 digits; the original _end variant 94% / 80% at
+32 digits), word problems 100%, in-text 89% overall (was 70%): 100% after stories and
+biographies and on blank-line joins. It still fails after code on the same line (code/inline
+cells 10–76%; in-text code 68%, inline 79%); 6 of 36 cells are below 0.95. In 189 of 192
+failures there (inspected in the raw outputs) the model makes no call and writes digits itself;
+in 3 it calls but the answer is wrong. Not every cell is ≥ 0.95, so the claim stays, narrowed:
+the circuit under the gate is exact where this baseline fails, on equations that follow code on
+the same line (a join held out from both systems). Mixed-text loss of the variant: blank 2.164,
+long 1.882, inline 2.516, marked 2.226 (all above the varied-exposure gated experts).

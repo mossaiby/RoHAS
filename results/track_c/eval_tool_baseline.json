@@ -1,8 +1,8 @@
 {
  "meta": {
-  "git_commit": "6333cc8961766152fac83684a361e44168b32a8a",
+  "git_commit": "7fa8a33ea8d5e54b94cfac716ad6b9e9fcb68f5f",
   "git_dirty": true,
-  "timestamp": "2026-11-10T23:53:08",
+  "timestamp": "2026-11-12T02:36:28",
   "python": "3.11.9",
   "platform": "Windows-10-10.0.26300-SP0",
   "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
@@ -12,7 +12,7 @@
   "torch": "2.6.0+cu124",
   "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
   "transformers": "5.22.1",
-  "wall_time_s": 155.31
+  "wall_time_s": 232.54
  },
  "data": {
   "systems": {
@@ -104,6 +104,51 @@
      "employer": 0.016666666666666666,
      "work_city": 0.02,
      "all": 0.02
+    }
+   },
+   "model:main_mono_s_calcv_end": {
+    "loss": {
+     "lang": 1.722940194606781,
+     "facts": 0.4155281975865364,
+     "math": 1.46972616314888,
+     "code": 2.0845515012741087,
+     "mixed": 2.163603183627129
+    },
+    "facts_heldout": {
+     "birth_year": 0.10166666666666667,
+     "birth_city": 0.055,
+     "university": 0.03333333333333333,
+     "major": 0.04,
+     "employer": 0.015,
+     "work_city": 0.19,
+     "all": 0.0725
+    },
+    "facts_train_templates": {
+     "birth_year": 0.63,
+     "birth_city": 0.9566666666666667,
+     "university": 0.9633333333333334,
+     "major": 0.95,
+     "employer": 0.9633333333333334,
+     "work_city": 0.97,
+     "all": 0.9055555555555556
+    },
+    "facts_new_heldout": {
+     "birth_year": 0.0016666666666666668,
+     "birth_city": 0.008333333333333333,
+     "university": 0.021666666666666667,
+     "major": 0.02666666666666667,
+     "employer": 0.025,
+     "work_city": 0.021666666666666667,
+     "all": 0.0175
+    },
+    "facts_new_train_templates": {
+     "birth_year": 0.013333333333333334,
+     "birth_city": 0.01,
+     "university": 0.02666666666666667,
+     "major": 0.023333333333333334,
+     "employer": 0.02,
+     "work_city": 0.03333333333333333,
+     "all": 0.021111111111111112
     }
    }
   }

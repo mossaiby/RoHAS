@@ -1,0 +1,100 @@
+{
+ "meta": {
+  "git_commit": "7fa8a33ea8d5e54b94cfac716ad6b9e9fcb68f5f",
+  "git_dirty": true,
+  "timestamp": "2026-11-12T02:33:20",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": 0,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1",
+  "wall_time_s": 1062.52
+ },
+ "data": {
+  "name": "main_mono_s_calcv_end",
+  "size": "s",
+  "params": 17504640,
+  "flops_per_token": 122722560,
+  "tokens": 49995776,
+  "flops": 6135609619906560,
+  "mix": {
+   "lang": 0.2,
+   "facts": 0.2,
+   "mathcalce": 0.2,
+   "code": 0.2,
+   "mixedcalcve": 0.2
+  },
+  "lr": 0.0003,
+  "init": "C:\\Users\\Farshid Mossaiby\\source\\repos\\atom-space\\checkpoints\\track_c\\main_mono_s.pt",
+  "own": "math",
+  "steps": 6103,
+  "batch_tokens": 8192,
+  "curve": [
+   {
+    "step": 1525,
+    "tokens": 12492800,
+    "train": 1.7205603122711182,
+    "lang": 1.832411789894104,
+    "facts": 0.4518414124846458,
+    "math": 1.3920865297317504,
+    "code": 2.225753718614578,
+    "mixed": 2.252373421192169
+   },
+   {
+    "step": 3050,
+    "tokens": 24985600,
+    "train": 1.3220561742782593,
+    "lang": 1.7807010769844056,
+    "facts": 0.42563305497169496,
+    "math": 1.4755635261535645,
+    "code": 2.162883538007736,
+    "mixed": 2.221051561832428
+   },
+   {
+    "step": 4575,
+    "tokens": 37478400,
+    "train": 0.947092592716217,
+    "lang": 1.7278502225875854,
+    "facts": 0.4154752612113953,
+    "math": 1.497304505109787,
+    "code": 2.1045483469963076,
+    "mixed": 2.1839532375335695
+   },
+   {
+    "step": 6100,
+    "tokens": 49971200,
+    "train": 1.2678759098052979,
+    "lang": 1.7014270961284637,
+    "facts": 0.4165313601493835,
+    "math": 1.472572499513626,
+    "code": 2.074753224849701,
+    "mixed": 2.168254721164703
+   },
+   {
+    "step": 6103,
+    "tokens": 49995776,
+    "train": 1.1614428758621216,
+    "lang": 1.7013903558254242,
+    "facts": 0.4163704127073288,
+    "math": 1.4756833493709565,
+    "code": 2.0743954181671143,
+    "mixed": 2.167652797698975
+   }
+  ],
+  "final": {
+   "step": 6103,
+   "tokens": 49995776,
+   "train": 1.1614428758621216,
+   "lang": 1.7013903558254242,
+   "facts": 0.4163704127073288,
+   "math": 1.4756833493709565,
+   "code": 2.0743954181671143,
+   "mixed": 2.167652797698975
+  }
+ },
+ "macros": {}
+}

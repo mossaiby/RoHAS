@@ -49,7 +49,7 @@ Data (written to `data/track_c/`, not in git): `experiments/track_c/data.py`, th
 | Expert seeds | `run_context.py` with `--seed` | `*_ctxv20_e1*`, `*_ctxv20_e2*` |
 | Circuit under the gate (Table 5) | `run_circuit.py --prefix main [--variant seeded]`, `run_robustness.py`, `run_ctxv_followup.py` | `eval_*_circuit*.json`, `eval_*_heldout.json` |
 | Circuit head refitted to convergence | `refit_head.py` | `refit_head.json`, `eval_conv_heldout.json` |
-| Calculator baseline (Table 6) | `tool_baseline.py` | `tool_heldout.json`, `tool_context.json` |
+| Calculator baseline (Table 6) | `tool_baseline.py`, then `--end` and `--end --varied` for the two variants | `tool_heldout.json`, `tool_context.json` |
 | False triggers and wrong arithmetic | `false_triggers.py` | `false_triggers.json` |
 | Adding facts (Table 7) | `run_add_facts.py`, `run_ctxv_followup.py --only add eval` | `eval_*add_facts*.json` |
 | Ablations (Table 12) | the gate variants in `run_circuit.py` | `eval_main_circuit*.json` |

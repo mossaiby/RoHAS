@@ -30,35 +30,26 @@ Pretrained, and Compiled Experts}
 \maketitle
 
 \begin{abstract}
-Language models are trained as one dense network on a mixture of factual text, procedural
-material such as arithmetic and code, and general prose, although these data types call for
-different training: facts should be stored verbatim and be updatable, procedures should
-generalise beyond the lengths seen in training, and prose needs distribution matching. We
-study the alternative of one expert per data type, each trained under its own regime, combined
-at every token by a small learned gate that needs no routing labels. An expert can be a trained
-network or a \emph{compiled} transformer whose weights are written by hand; an expert with
-nothing to say abstains with the uniform distribution, the null atom
-of~\citet{mossaiby_roas}, and an exact expert can also veto tokens. In a from-scratch study at
-matched compute, experts that are exposed to foreign context in varied formats, combined by the
-gate, beat a monolithic model on mixed text in every format we test, including two held out from
-all training (\resTrackCMixedInlineVaried{} vs.\ \resTrackCMixedInlineMonoS{} and
-\resTrackCMixedMarkedVaried{} vs.\ \resTrackCMixedMarkedMonoS{} nats per token). New facts are
-added by updating one expert, with the gate and the other experts unchanged, while the
-monolithic model gets worse on stories, code and mixed text and forgets old facts. A compiled arithmetic expert under the same
-gate gives exact answers to 32 digits on held-out problems, also when the arithmetic appears
-inside other text, where a model fine-tuned to call a calculator is exact on
-\resTrackCToolEndCtxAll\% of items. Over frozen pretrained experts that share a
-tokenizer (prose, code and math models of 0.5B--1.5B parameters), the same gate beats the
-best single expert and also the best fixed mixture of the experts on mixed text, by
-\resTrackBCleanMarginMin--\resTrackBCleanMarginMax{} nats per token, although most of the gain
-over a single expert comes from ensembling, and only when the gate's training data is new to
-every expert. Added to the frozen prose-and-code gate with three new parameters, the compiled
-arithmetic expert makes the pretrained system exact on held-out equations up to 32 digits and
-inside prose and code, where the gate over the pretrained models alone is exact on
-\resTrackBCircInTextGatePct\% of items, at a cost of at most \resTrackBCircCostMax{} nats per
-token elsewhere. The compiled arithmetic experts, and an expression-parser expert that calls
-them, are exact on \resTrackACorrectnessCases{} test cases with \resTrackACorrectnessErrors{}
-errors, at operand lengths where prompted models of up to 1.5B parameters fail.
+Language models store facts, execute procedures such as arithmetic, and produce prose with one
+set of weights, although these data types call for different training. We study the
+alternative: separate experts, each trained or built for one type, mixed at every token by a
+small gate trained without routing labels. An expert can be a network trained from scratch, a
+frozen pretrained model, or a \emph{compiled} transformer whose weights are written by hand
+(ours are exact on \resTrackACorrectnessCases{} test cases); an expert with nothing to say
+abstains with the uniform distribution, and an exact expert can veto tokens. Experts can be
+added or updated while the gate stays frozen. Added with three new parameters to a frozen gate
+over two pretrained 0.5B models, a compiled arithmetic expert makes them exact on held-out
+equations up to 32 digits, also inside prose and code, where the gate over the models alone is
+exact on \resTrackBCircInTextGatePct\% of items; elsewhere the loss rises by at most
+\resTrackBCircCostMax{} nats per token. In a from-scratch study at matched compute, experts
+exposed to foreign context beat a monolithic model on mixed text in formats held out from all
+training (\resTrackCMixedInlineVaried{} vs.\ \resTrackCMixedInlineMonoS{} and
+\resTrackCMixedMarkedVaried{} vs.\ \resTrackCMixedMarkedMonoS{} nats per token), new facts are
+added by updating one expert, and the compiled expert stays exact inside text where a model
+fine-tuned to call a calculator does not. With pretrained experts, most of the gain over a
+single expert is ensembling, and a gate trained on data that an expert has memorised trusts it
+where it does not help. We fixed tests and criteria in advance where we could, and report the
+runs that failed.
 \end{abstract}
 
 % =====================================================================================
@@ -515,9 +506,20 @@ or code only in the mixed documents, joined by blank lines; such an equation inl
 every system. The tool model is exact on \resTrackCToolEndCtxAll\% of these items, and on
 \resTrackCToolEndCtxCode\% after code. In every failure we inspected in the raw outputs, the call is missing:
 after ``='' the model writes digits itself. The gated system with the circuit is exact on every
-item, for each of three expert seeds. The tool's trigger is learned from where calls appear
-in its training data. The circuit decides for itself where it applies, and the gate learns from
-confidence alone when to trust it.
+item, for each of three expert seeds.
+
+The tool model saw mixed text in one format and as \resTrackCMonoSMixedPct\% of its data, while
+the gated experts were exposed to mixed text in three formats, as a fifth of their tokens. To
+check that this difference does not explain the result, we fine-tuned a third variant (decided
+after the first two runs, before training it): closing marker, mixed documents in the three
+newline-based formats of the experts' exposure, and a mixed share of 0.2. It closes most of the
+gap (Table~\ref{tab:scratch_tool}): it is exact on held-out arithmetic at every length, and
+after stories, after biographies and on blank-line joins. It still fails when an equation
+follows code on the same line, a join that neither system trained on: it is exact on
+\resTrackCToolVarCtxCode\% of the items after code and \resTrackCToolVarCtxInline\% of inline
+items. Again, in almost every failure the model makes no call and writes digits itself. The
+tool's trigger is learned from where calls appear in its training data. The circuit decides for
+itself where it applies, and the gate learns from confidence alone when to trust it.
 
 \paragraph{False triggers.} The circuit's rule fires wherever an equation appears, so it can be
 wrong about text: its predicted digit may not be the next token, or the text may contain a token
@@ -543,7 +545,8 @@ meets one such case in web text.
 \caption{A calculator tool versus the circuit under the gate: percentage of exact answers.
 Held-out arithmetic by operator and digits per operand (100 items per cell) and word problems;
 arithmetic inside other text (+, $-$, $\times$ at 4 and 16 digits, 600 items per context type,
-900 per join). The tool models are mono\_s fine-tuned with call labels.}
+900 per join). The tool models are mono\_s fine-tuned with call labels; the last of them also
+on mixed text in the three formats of the experts' exposure.}
 \label{tab:scratch_tool}
 {\footnotesize\setlength{\tabcolsep}{2.5pt}\IfFileExists{tables/track_c_tool.tex}{\input{tables/track_c_tool}}{\pending{table}}}
 \end{table}
@@ -875,7 +878,9 @@ though not on math (H2). With pretrained experts, replacing the prose expert und
 gate moves the code loss by less than a hundredth of a nat, and the gate still beats both of its
 experts; whether a retrained gate would do better we could not test at our tolerance. An exact expert
 can join the same mixture with no labels, and with the two-level gate and vetoes it is exact
-where a model trained to call a calculator is not. With pretrained experts the gate still beats
+where a model trained to call a calculator is not; trained on varied mixed text, that model
+fails only where an equation follows code on the same line, a format neither system saw. With
+pretrained experts the gate still beats
 the best single expert and the best fixed mixture, but most of the gain over a single expert is
 ensembling; routing adds a smaller, consistent part. Where one expert is clearly better on
 part of the text, routing is decisive: the compiled expert added to the frozen pretrained gate
