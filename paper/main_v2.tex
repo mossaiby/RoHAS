@@ -165,10 +165,11 @@ changed at all, are left to future work.
   op/.style={box, fill=orange!12},
   lab/.style={font=\footnotesize, inner sep=1.5pt}]
   % context and frozen experts
-  \node[box] (x) at (0,0) {context\\$x$};
+  \node[box] (x) at (-0.27,0) {context $x$};
   \node[frozen] (e1) at (2.75,1.6) {LM expert $1$};
-  \node at (2.75,0.85) {$\vdots$};
   \node[frozen] (eE) at (2.75,0.1) {LM expert $E$};
+  \foreach \k in {-1,0,1}
+    \fill ($(e1.south)!0.5!(eE.north)+(0,0.11*\k)$) circle (0.55pt);
   \node[frozen] (c) at (2.75,-1.6) {compiled expert\\answer or null atom $u$};
   \foreach \t in {e1,eE,c} \draw[->] (x.east) -- (\t.west);
   % gate
