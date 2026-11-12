@@ -336,6 +336,11 @@ def track_c_macros(res):
             for i, n in enumerate(["PlusSixteen", "PlusThirtyTwo", "MinusThirtyTwo", "TimesEight", "Word",
                                    "CtxStory", "CtxBio", "CtxCode", "CtxBlank", "CtxInline", "CtxAll"]):
                 out[("track_c", f"{key}{n}")] = f"{cells[i]:.0f}"
+    tf = res.get("track_c/tool_failures", {}).get("data", {})
+    for m, key in (("main_mono_s_calc_end", "End"), ("main_mono_s_calcv_end", "Var")):
+        if m in tf:
+            out[("track_c", f"Tool{key}FailWrong")] = str(tf[m]["wrong"])
+            out[("track_c", f"Tool{key}FailNoCall")] = str(tf[m].get("no_call", 0))
     ft = res.get("track_c/false_triggers", {}).get("data", {})
     if "scan" in ft:
         sc = ft["scan"]
@@ -647,6 +652,8 @@ def track_b_circuit_macros(res):
     h, L = r["head"], r["loss"]
     put("CircLamOn", h["lambda_active"], lambda z: f"{z:.4f}")
     put("CircLamOff", h["lambda_inactive"], lambda z: f"{z:.4f}")
+    if "trajectory" in h:
+        put("CircLamOnFiveHundred", h["trajectory"]["500"]["lambda_active"], fmt2)
     for f, key in (("prose_val", "Prose"), ("code_val", "Code"), ("notebooks_val", "Notebook")):
         put(f"CircCost{key}", L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"], lambda z: f"{z:.4f}")
     put("CircCostMax", max(L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"]

@@ -1,0 +1,8 @@
+# The earlier prototype (qwen25_quad_space_engine.py). The paper uses requirements.txt.
+# python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+transformers
+numpy
+bitsandbytes
+accelerate
+optimum
+auto-gptq

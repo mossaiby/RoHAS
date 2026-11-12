@@ -103,15 +103,22 @@ def train_head(gate, circ):
     lp_gate, act, lp_c = lp_gate.cuda().flatten(), act.cuda().flatten(), lp_c.cuda().flatten()
     wb = torch.zeros(3, device="cuda", requires_grad=True)
     opt = torch.optim.Adam([wb], lr=3e-2)
+    trajectory = {}                                    # the head at fewer steps (500 was the first, unconverged fit)
     for step in range(10000):
         lc, lr = head_logw(wb, act)
         loss = -torch.logaddexp(lc + lp_c, lr + lp_gate).mean()
         opt.zero_grad()
         loss.backward()
         opt.step()
+        if step + 1 in (500, 2000, 5000):
+            with torch.no_grad():
+                lc, _ = head_logw(wb, act)
+                trajectory[str(step + 1)] = {"lambda_active": float(lc[act].exp().mean()),
+                                             "lambda_inactive": float(lc[~act].exp().mean())}
     lc, _ = head_logw(wb.detach(), act)
     info = {"w": wb.detach().cpu().tolist(), "train_loss": float(loss), "active_frac": float(act.float().mean()),
-            "lambda_active": float(lc[act].exp().mean()), "lambda_inactive": float(lc[~act].exp().mean())}
+            "lambda_active": float(lc[act].exp().mean()), "lambda_inactive": float(lc[~act].exp().mean()),
+            "trajectory": trajectory}
     print("head", json.dumps(info), flush=True)
     torch.save({"wb": wb.detach().cpu(), "info": info}, os.path.join(CKPT, "b_circuit_head.pt"))
     return wb.detach().cpu(), info

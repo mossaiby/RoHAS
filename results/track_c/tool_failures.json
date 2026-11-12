@@ -1,0 +1,173 @@
+{
+ "meta": {
+  "git_commit": "23b03a6be705a17111a3c766eb8264f4f9fd3de8",
+  "git_dirty": true,
+  "timestamp": "2026-11-12T09:30:41",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "cpu_count": 16,
+  "seed": null,
+  "numpy": "2.4.6",
+  "torch": "2.6.0+cu124",
+  "gpu": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+  "transformers": "5.22.1"
+ },
+ "data": {
+  "main_mono_s_calc_end": {
+   "items": 1800,
+   "wrong": 534,
+   "no_call": 505,
+   "bad_call": 29,
+   "by_cell": {
+    "lang/blank/no_call": 16,
+    "lang/inline/no_call": 90,
+    "lang/inline/bad_call": 8,
+    "facts/blank/bad_call": 1,
+    "facts/blank/no_call": 1,
+    "facts/inline/no_call": 20,
+    "facts/inline/bad_call": 17,
+    "code/blank/no_call": 93,
+    "code/blank/bad_call": 2,
+    "code/inline/no_call": 285,
+    "code/inline/bad_call": 1
+   },
+   "examples": [
+    {
+     "context_end": "t poke her teeth so much.\n\n9553711463692954+2517095498717408",
+     "output": "=12877777777777777777777777777777777",
+     "want": "=12070806962410362",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "sion to save the kingdom.\n\n8024278312173009+8087433880832333",
+     "output": "=10234545454545454545454545454545454",
+     "want": "=16111712193005342",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "out of her hands. \"Oh no!\n\n7522467844671163+1405943269605730",
+     "output": "=12344444444444444444444444444444444",
+     "want": "=8928411114276893",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "It made a big fire.\n\n1173974338256621+2116874556734950",
+     "output": "=10272777777777777777777777777777777",
+     "want": "=3290848894991571",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "led the bowl to the brim.\n\n3979342997991936+7341841702563280",
+     "output": "=25799999999999999999999999999999999",
+     "want": "=11321184700555216",
+     "kind": "no_call"
+    },
+    {
+     "context_end": " rooms and dark hallways.\n\n1702737869873095+1817456718760203",
+     "output": "=10234777777777777777777777777777777",
+     "want": "=3520194588633298",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "it was a beautiful pearl!\n\n4430415171886568-2541263505436895",
+     "output": "=44340444444444444444444444444444444",
+     "want": "=1889151666449673",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "cozy home away from home.\n\n6038011254392696-2385832645404077",
+     "output": "=\u00e2\u20ac\u0153It\u00e2\u20ac\u2122s a nice place to stay and be s",
+     "want": "=3652178608988619",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "a beautiful velvet dress.\n\n2720839836854196-2755054533512298",
+     "output": "=22287899999999999999999999999999999",
+     "want": "=-34214696658102",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "oking for a hat for John.\n\n9232812923067794-3382032952906400",
+     "output": "=12348888888888888888888888888888888",
+     "want": "=5850779970161394",
+     "kind": "no_call"
+    }
+   ]
+  },
+  "main_mono_s_calcv_end": {
+   "items": 1800,
+   "wrong": 192,
+   "no_call": 190,
+   "bad_call": 2,
+   "by_cell": {
+    "code/blank/no_call": 1,
+    "code/inline/no_call": 189,
+    "code/inline/bad_call": 2
+   },
+   "examples": [
+    {
+     "context_end": "  \"ou=groups,dc=mozilla\",\n\n3935047181302697+7870397072825758",
+     "output": "=\",",
+     "want": "=11805444254128455",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "ent,\n                         'ruby-proxy-object') 9945+1170",
+     "output": "=1170.",
+     "want": "=11115",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "\n        and creates a new csv file with forecasts 7065+3090",
+     "output": "=20000000000000000000000000000000000",
+     "want": "=10155",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "\":\n            mayconnect = False\n\n    return info 8522+6506",
+     "output": "=8522",
+     "want": "=15028",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "    ])\n    if cm is False:\n        cm = np.array([ 3818+6770",
+     "output": "=255+6770+6770+6770+6770+6770+6770+6",
+     "want": "=10588",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "ss)\n                elif \"_MII_SITEDATABASE\" in l: 3890+7904",
+     "output": "=1123:",
+     "want": "=11794",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "         identifier=constants.HVAC_NS[class_name], 8268+6011",
+     "output": "=self.class_name)",
+     "want": "=14279",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "id, l3_port_check=True):\n        if l3_port_check: 5911+2878",
+     "output": "=1112.0",
+     "want": "=8789",
+     "kind": "no_call"
+    },
+    {
+     "context_end": "id, server):\n    flags = maskToFlags(stat.S_IFREG) 3229+7387",
+     "output": "=127.0",
+     "want": "=10616",
+     "kind": "no_call"
+    },
+    {
+     "context_end": " response.set_cookie(app.session_cookie_name, val, 1921+1903",
+     "output": "=1903)",
+     "want": "=3824",
+     "kind": "no_call"
+    }
+   ]
+  }
+ },
+ "macros": {}
+}

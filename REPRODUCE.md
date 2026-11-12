@@ -17,9 +17,16 @@ cd paper && latexmk -pdf main_v2.tex
 
 ## Environment
 
-Python 3.11, PyTorch 2.6.0 (CUDA 12.4), transformers 5.x, numpy 2.x, plus `tokenizers`,
-`datasets`, `pyarrow` and `huggingface_hub` for the data. Every result file records the exact
-versions, the git commit and the hardware in its `meta` block.
+Python 3.11, PyTorch 2.6.0 (CUDA 12.4), transformers 5.22.1, numpy 2.4.6, plus `tokenizers`,
+`pyarrow` and `huggingface_hub` for the data:
+
+```bash
+python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -r requirements.txt
+```
+
+Every result file records the exact versions, the git commit and the hardware in its `meta`
+block. Some scripts load models with `torch_dtype=`, which transformers 4.x and 5.x both accept.
 
 All runs used one laptop: an RTX 3050 Ti with 4 GB, 16 GB RAM. Some runs were paused by
 hibernation; their wall-clock times are marked invalid (`null`) in the result files.

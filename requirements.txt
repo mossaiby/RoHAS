@@ -1,7 +1,11 @@
-# python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-transformers
-numpy
-bitsandbytes
-accelerate
-optimum
-auto-gptq
+# Packages for the paper's experiments (paper/main_v2.tex, see REPRODUCE.md), at the versions
+# the results were produced with. Install PyTorch for CUDA 12.4 first:
+#   python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+# The earlier prototype (qwen25_quad_space_engine.py) needs requirements-prototype.txt instead.
+torch==2.6.0
+transformers==5.22.1
+huggingface_hub>=1.31,<2.0
+tokenizers==0.23.3
+safetensors
+numpy==2.4.6
+pyarrow

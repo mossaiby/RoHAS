@@ -1,8 +1,8 @@
 {
  "meta": {
-  "git_commit": "6bd1d76b672fe4e20f90820068ef25b4eaf15be4",
+  "git_commit": "23b03a6be705a17111a3c766eb8264f4f9fd3de8",
   "git_dirty": true,
-  "timestamp": "2026-11-11T17:51:42",
+  "timestamp": "2026-11-12T09:27:34",
   "python": "3.11.9",
   "platform": "Windows-10-10.0.26300-SP0",
   "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
@@ -23,7 +23,21 @@
    "train_loss": 2.443002700805664,
    "active_frac": 0.031939927488565445,
    "lambda_active": 0.9997525811195374,
-   "lambda_inactive": 0.0014989468036219478
+   "lambda_inactive": 0.0014989468036219478,
+   "trajectory": {
+    "500": {
+     "lambda_active": 0.7174550890922546,
+     "lambda_inactive": 0.0016862843185663223
+    },
+    "2000": {
+     "lambda_active": 0.9702093005180359,
+     "lambda_inactive": 0.001520215650089085
+    },
+    "5000": {
+     "lambda_active": 0.9965288639068604,
+     "lambda_inactive": 0.001501278835348785
+    }
+   }
   },
   "loss": {
    "prose_val": {

@@ -504,8 +504,9 @@ is larger when the arithmetic appears inside other text, after a story, a biogra
 segment, joined by a blank line or inline. In training, equations follow stories, biographies
 or code only in the mixed documents, joined by blank lines; such an equation inline is new to
 every system. The tool model is exact on \resTrackCToolEndCtxAll\% of these items, and on
-\resTrackCToolEndCtxCode\% after code. In every failure we inspected in the raw outputs, the call is missing:
-after ``='' the model writes digits itself. The gated system with the circuit is exact on every
+\resTrackCToolEndCtxCode\% after code. Its raw outputs show why: in \resTrackCToolEndFailNoCall{}
+of its \resTrackCToolEndFailWrong{} wrong answers the call is missing, and after ``='' the model
+writes digits itself; in the others it calls the tool, but the answer still comes out wrong. The gated system with the circuit is exact on every
 item, for each of three expert seeds.
 
 The tool model saw mixed text in one format and as \resTrackCMonoSMixedPct\% of its data, while
@@ -517,7 +518,8 @@ gap (Table~\ref{tab:scratch_tool}): it is exact on held-out arithmetic at every 
 after stories, after biographies and on blank-line joins. It still fails when an equation
 follows code on the same line, a join that neither system trained on: it is exact on
 \resTrackCToolVarCtxCode\% of the items after code and \resTrackCToolVarCtxInline\% of inline
-items. Again, in almost every failure the model makes no call and writes digits itself. The
+items. Again the call is missing in most failures (\resTrackCToolVarFailNoCall{} of
+\resTrackCToolVarFailWrong{}). The
 tool's trigger is learned from where calls appear in its training data. The circuit decides for
 itself where it applies, and the gate learns from confidence alone when to trust it.
 
@@ -724,7 +726,7 @@ criteria were fixed before any outputs were computed: exact answers ($\geq 0.99$
 cell of held-out equations, $\geq 0.95$ inside other text, a loss within 0.005 nats of the
 gate alone on prose, code and notebooks, and a circuit weight $\geq 0.9$ where it is active
 and $\leq 0.01$ where it is not. We changed one thing after a first look: the head had first
-been fitted for 500 steps, where its weight on the active circuit was 0.72, below the last
+been fitted for 500 steps, where its weight on the active circuit was \resTrackBCircLamOnFiveHundred{}, below the last
 criterion, and the loss was still falling. The pre-registration fixed no step count, and the
 head is now fitted to convergence; the other criteria were read off only then.
 

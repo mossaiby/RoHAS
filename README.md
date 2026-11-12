@@ -107,7 +107,7 @@ where $h_t$ provides the boundary trigger and $\bar{h}_{\mathrm{win}}$ preserves
 ### Setup
 ```bash
 python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-pip install -r requirements.txt
+pip install -r requirements-prototype.txt
 python qwen25_quad_space_engine.py            # Qwen-2.5-7B-Instruct (4-bit); falls back to 3B if VRAM is short
 python qwen25_quad_space_engine.py --model <hf-model-id>
 ```

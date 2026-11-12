@@ -874,3 +874,10 @@ in 3 it calls but the answer is wrong. Not every cell is ≥ 0.95, so the claim 
 the circuit under the gate is exact where this baseline fails, on equations that follow code on
 the same line (a join held out from both systems). Mixed-text loss of the variant: blank 2.164,
 long 1.882, inline 2.516, marked 2.226 (all above the varied-exposure gated experts).
+
+**Correction (2026-11-12; tool_failures.py, results/track_c/tool_failures.json).** The paper said
+that in every inspected failure of the closing-marker calculator model the call is missing. A
+full classification of its 534 wrong in-text answers (of 1,800) finds no call in 505 and a call
+that still gives a wrong answer in 29. The varied variant: 190 of 192 without a call. The paper
+now gives these counts from the result file. The 500-step weight of the Track B circuit head
+(0.72) is now stored in circuit_gate.json (head trajectory; the refit is bit-identical).
