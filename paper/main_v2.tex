@@ -160,16 +160,16 @@ changed at all, are left to future work.
 \centering
 \begin{tikzpicture}[font=\small, >={Stealth[length=2mm]},
   box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt, minimum height=8mm},
-  frozen/.style={box, fill=gray!12, minimum width=27mm},
+  frozen/.style={box, fill=gray!12, font=\footnotesize, text width=31mm, minimum height=10mm},
   learnt/.style={box, fill=blue!8, minimum width=36mm, font=\footnotesize},
   op/.style={box, fill=orange!12},
   lab/.style={font=\footnotesize, inner sep=1.5pt}]
   % context and frozen experts
   \node[box] (x) at (0,0) {context\\$x$};
-  \node[frozen] (e1) at (2.6,1.55) {LM expert $1$};
-  \node at (2.6,0.85) {$\vdots$};
-  \node[frozen] (eE) at (2.6,0.15) {LM expert $E$};
-  \node[frozen] (c) at (2.6,-1.6) {compiled expert\\answer or null atom $u$};
+  \node[frozen] (e1) at (2.75,1.6) {LM expert $1$};
+  \node at (2.75,0.85) {$\vdots$};
+  \node[frozen] (eE) at (2.75,0.1) {LM expert $E$};
+  \node[frozen] (c) at (2.75,-1.6) {compiled expert\\answer or null atom $u$};
   \foreach \t in {e1,eE,c} \draw[->] (x.east) -- (\t.west);
   % gate
   \node[learnt] (g) at (7.7,0.85) {$\big[\mathrm{LN}(h_e,\bar h_e),\ c_e\big]_{e\le E}$\\
@@ -180,7 +180,7 @@ changed at all, are left to future work.
   \node[lab, anchor=south] at (gate.north) {gate: trained without routing labels};
   \draw[->] (e1.east) -- (g.west);
   \draw[->] (eE.east) -- (g.west);
-  \node[lab, anchor=south] at (4.6,1.25) {$h_e, c_e$};
+  \node[lab] at ($(e1.east)!0.5!(eE.east)+(0.3,0)$) {$h_e, c_e$};
   \draw[->] (c.east) -- node[lab, above] {$c_{\mathrm{circ}}$} (a.west);
   % mixture, vetoes, output
   \node[op, minimum height=36mm, minimum width=19mm] (mix) at (11.7,-0.2)
