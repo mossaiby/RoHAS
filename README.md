@@ -112,7 +112,7 @@ python qwen25_quad_space_engine.py            # Qwen-2.5-7B-Instruct (4-bit); fa
 python qwen25_quad_space_engine.py --model <hf-model-id>
 ```
 
-The paper (`paper/main.tex`, `paper/main.pdf`) evaluates `qwen25_quad_space_engine.py`.
+The earlier, unsubmitted paper (`misc/old_paper/main.tex`, `misc/old_paper/main.pdf`) evaluates `qwen25_quad_space_engine.py`.
 Its arithmetic atoms (`+ - * /`, comparison) are hand-weighted transformers in `circuits/`
 (no trained weights, no Python arithmetic); check them with `python tests/test_circuits.py`.
 Whole expressions with `( )`, precedence and unary minus go to a parser atom (`circuits/parser.py`),

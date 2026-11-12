@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 
-# LaTeX build artifacts (keep main.tex and main.pdf)
+# LaTeX build artifacts
 paper/*.aux
 paper/*.dvi
 paper/*.fdb_latexmk
