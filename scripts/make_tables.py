@@ -269,9 +269,102 @@ def table_track_c_update(res):
     return tabular("lrrrrrrrr", head, rows)
 
 
+# ---- scale study (corpus v2, 600 biographies per person; run_scale.py) -------------------
+SCALE = [("sc16f", "Sixteen"), ("sc17f", "Seventeen")]
+
+
+def scale_point(res, tag):
+    """The numbers of one scale point, or None if its files are missing."""
+    e = res.get(f"track_c/eval_{tag}")
+    if not e:
+        return None
+    s = e["data"]["systems"]
+    sy = lambda n: s[f"model:{tag}_{n}"]  # noqa: E731
+    ga, gc = s[f"gate:{tag}_gate_atom:prob"], s[f"gate:{tag}_gate_conf:prob"]
+    tr = lambda n: res[f"track_c/train_{tag}_{n}"]["data"]  # noqa: E731
+    dg = lambda f, n: res[f"track_c/diag_mixed_{f + '_' if f else ''}{tag}"]["data"]["systems"][f"{tag}_{n}"]["all"]  # noqa: E731
+    cells = lambda d: [v for op in d.values() for v in op.values()]  # noqa: E731
+    p = {"flops": tr("mono_s")["flops"], "params_s": tr("mono_s")["params"], "params_m": tr("mono_m")["params"],
+         "tokens_s": tr("mono_s")["tokens"], "gate_tokens": tr("gate_atom")["tokens"]}
+    for f, key in (("", "blank"), ("long", "long"), ("inline", "inline"), ("marked", "marked")):
+        p[f"{key}_gate"], p[f"{key}_mono_s"], p[f"{key}_mono_m"] = (dg(f, "gate_conf:prob"), dg(f, "mono_s"),
+                                                                    dg(f, "mono_m"))
+    p.update(prose_expert=sy("lang")["loss"]["lang"], prose_mono_s=sy("mono_s")["loss"]["lang"],
+             code_expert=sy("code")["loss"]["code"], code_mono_s=sy("mono_s")["loss"]["code"],
+             recall_conf=gc["facts_heldout"]["all"], recall_atom=ga["facts_heldout"]["all"],
+             recall_mono_s=sy("mono_s")["facts_heldout"]["all"], recall_mono_m=sy("mono_m")["facts_heldout"]["all"],
+             number_min=min(cells(ga["arith_number"])), strict_min=min(cells(ga["arith"])),
+             strict_mean=sum(cells(ga["arith"])) / len(cells(ga["arith"])),
+             facts_expert=sy("facts")["loss"]["facts"], facts_gate=ga["loss"]["facts"],
+             facts_mono_s=sy("mono_s")["loss"]["facts"], facts_mono_m=sy("mono_m")["loss"]["facts"],
+             math_gate=ga["loss"]["math"], math_mono_s=sy("mono_s")["loss"]["math"])
+    rise = {}
+    for n in ("seed", "facts", "mono_s"):
+        f = [c["facts"] for c in tr(n)["curve"] if "facts" in c]
+        rise[n] = f[-1] - min(f)
+    p["facts_rise"], p["facts_rise_max"] = rise, max(rise.values())
+    return p
+
+
+def scale_macros(res):
+    out = {}
+    for tag, word in SCALE:
+        p = scale_point(res, tag)
+        if not p:
+            continue
+        put = lambda k, v, f=fmt3: out.__setitem__(("track_c", f"Scale{word}{k}"), f(v))  # noqa: E731
+        put("Flops", p["flops"], lambda z: f"{z:.1e}".replace("e+", r"\times 10^{") + "}")
+        put("ParamsS", p["params_s"], lambda z: f"{z / 1e6:.1f}M")
+        put("ParamsM", p["params_m"], lambda z: f"{z / 1e6:.1f}M")
+        put("TokensS", p["tokens_s"], lambda z: f"{z / 1e9:.2f}B")
+        put("GateTokens", p["gate_tokens"], lambda z: f"{z / 1e6:.0f}M")
+        for key in ("blank", "long", "inline", "marked"):
+            K = key.capitalize()
+            put(f"{K}Gate", p[f"{key}_gate"])
+            put(f"{K}MonoS", p[f"{key}_mono_s"])
+            put(f"{K}MonoM", p[f"{key}_mono_m"])
+            put(f"{K}Margin", p[f"{key}_mono_s"] - p[f"{key}_gate"])
+        for k in ("prose", "code"):
+            K = k.capitalize()
+            put(f"{K}Expert", p[f"{k}_expert"])
+            put(f"{K}MonoS", p[f"{k}_mono_s"])
+            put(f"{K}Margin", p[f"{k}_mono_s"] - p[f"{k}_expert"])
+        for k, K in (("recall_conf", "RecallConf"), ("recall_atom", "RecallAtom"), ("recall_mono_s", "RecallMonoS"),
+                     ("recall_mono_m", "RecallMonoM"), ("strict_min", "StrictMin"), ("strict_mean", "StrictMean")):
+            put(K, p[k], fmt2)
+        put("NumberMinPct", 100 * p["number_min"], lambda z: f"{z:.0f}")
+        put("FactsRiseMax", p["facts_rise_max"])
+        for k, K in (("facts_expert", "FactsExpert"), ("facts_gate", "FactsGate"), ("facts_mono_s", "FactsMonoS"),
+                     ("facts_mono_m", "FactsMonoM"), ("math_gate", "MathGate"), ("math_mono_s", "MathMonoS")):
+            put(K, p[k])
+    return out
+
+
+def table_track_c_scale(res):
+    pts = [(tag, scale_point(res, tag)) for tag, _ in SCALE]
+    pts = [(t, p) for t, p in pts if p]
+    if not pts:
+        return "% no scale-study results\n"
+    vs = lambda a, b: lambda p: f"{fmt3(p[a])} / {fmt3(p[b])}"  # noqa: E731
+    rows = [("Mixed text, blank lines: gate / mono\_s", vs("blank_gate", "blank_mono_s")),
+            ("Mixed text, long: gate / mono\_s", vs("long_gate", "long_mono_s")),
+            ("Mixed text, inline: gate / mono\_s", vs("inline_gate", "inline_mono_s")),
+            ("Mixed text, marked: gate / mono\_s", vs("marked_gate", "marked_mono_s")),
+            ("Prose: prose expert / mono\_s", vs("prose_expert", "prose_mono_s")),
+            ("Code: code expert / mono\_s", vs("code_expert", "code_mono_s")),
+            ("Biographies: facts expert / gate / mono\_s",
+             lambda p: f"{fmt3(p['facts_expert'])} / {fmt3(p['facts_gate'])} / {fmt3(p['facts_mono_s'])}"),
+            ("Math: gate / mono\_s", vs("math_gate", "math_mono_s")),
+            ("Held-out fact recall: gate / mono\_s", lambda p: f"{fmt2(p['recall_conf'])} / {fmt2(p['recall_mono_s'])}"),
+            ("Arithmetic, answer exact (worst cell)", lambda p: f"{100 * p['number_min']:.0f}\\%")]
+    head = "Measure & " + " & ".join(f"{p['flops']:.0e}".replace("e+", r"$\times 10^{") + "}$ FLOPs" for _, p in pts)
+    body = [f"{lab} & " + " & ".join(f(p) for _, p in pts) + " \\\\" for lab, f in rows]
+    return tabular("l" + "r" * len(pts), head, body)
+
+
 C_TABLES = [("track_c_types", table_track_c_types), ("track_c_mixed", table_track_c_mixed),
             ("track_c_arith", table_track_c_arith), ("track_c_update", table_track_c_update),
-            ("track_c_tool", table_track_c_tool)]
+            ("track_c_tool", table_track_c_tool), ("track_c_scale", table_track_c_scale)]
 
 
 def track_c_macros(res):
@@ -696,6 +789,7 @@ def derived_macros(res):
     out.update(track_b_macros(res))
     out.update(track_b_circuit_macros(res))
     out.update(track_b_swap_macros(res))
+    out.update(scale_macros(res))
     return out
 
 

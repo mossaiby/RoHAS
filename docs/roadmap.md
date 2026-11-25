@@ -996,3 +996,67 @@ text only, does not hand plain facts documents to the facts expert; and its math
 slightly above mono_s's at both points (0.711 vs 0.706, 0.706 vs 0.694). With the larger facts
 set, sc16f's mono_s and mono_m have higher facts loss than at sc16 (0.606 vs 0.421, 0.828 vs
 0.582): at 5e16 they see each biography about once.
+
+### Track B, step 5: GSM8K accuracy with 1.5B experts and the compiled circuit (pre-registered 2026-11-25, before any 1.5B outputs, code or data on the 3090)
+
+The question: when frozen pretrained experts solve GSM8K under the label-free gate, does adding
+the compiled circuit raise answer accuracy, by making the arithmetic inside the solutions exact?
+This is a generation benchmark, not a loss.
+
+- **Experts (frozen, bf16, all on the RTX 3090):** Qwen2.5-1.5B (base15), Qwen2.5-Coder-1.5B
+  (coder15), Qwen2.5-Math-1.5B (math). One tokenizer (checked: identical vocabularies of 151,936).
+- **Gate:** the Track B gate (gate.py, unchanged recipe: 3 epochs on m3c_train, AdamW 1e-3,
+  cosine, batch 8, seed 0) over the three, trained on cached outputs. The data files are those
+  of step 2's uncontaminated re-run: GSM8K test even items (without the "<<...>>" annotations)
+  build m3c_train, so **GSM8K is evaluated only on the 659 odd test items**, none seen by any
+  trained part.
+- **The circuit for GSM8K text (`GsmCircuit`).** The Track C circuit expert with one stricter
+  trigger and the other operations of circuits/arith.py: it is active when the context ends with
+  `<<a op b=` [answer prefix], with a and b non-negative decimals (digits, at most one "."),
+  op one of + − × ÷ (`*`, `/`), "<<" immediately before a and "=" immediately after b; so a
+  chained annotation such as `<<3*4+2=` never triggers it (the Track C rule would have computed
+  4+2). The answer is arith.evaluate (÷ to 6 places), with trailing fractional zeros and a
+  trailing "." removed; division by zero abstains. Vetoes as in Track C (after a complete answer,
+  no digit and no "."). The head (3 parameters) is fitted as in step 3, on a4_train with the
+  Track C trigger, against the new gate, to convergence (10,000 steps); its features do not
+  depend on the trigger, so the same head serves the GSM8K trigger.
+- **Evaluation:** greedy decoding, 8-shot: the prompt is 8 GSM8K train items (random.Random(0),
+  fixed) as `Question: q\nAnswer: a` with the original answers (annotations and "#### n"
+  kept), joined by blank lines, then `Question: q\nAnswer:`. Up to 384 new tokens; a row stops
+  at a blank line, "Question:" or end of text. Accuracy = the number after "####" equals the
+  reference (commas, "$" removed; numeric comparison); the last number in the output is a
+  second, reported score (flexible). KV-cached decoding with left padding.
+- **Systems:** base15, coder15, math alone; gate; gate + circuit; base15 + circuit (same head
+  and vetoes); and a calculator tool, as in the original GSM8K paper, under the gate and under
+  base15: when the text ends with `=` inside an open `<<`, the expression since `<<` (numbers,
+  + − × ÷, parentheses) is evaluated exactly, and its value (an integer, or 6 places with
+  zeros removed) followed by `>>` is written into the text.
+- **Criteria:**
+  - Q1 (main): gate + circuit is more accurate than the gate; the paired 95% bootstrap interval
+    of the difference (10,000 resamples of the 659 items, seed 0) lies above zero.
+  - Q2: in the outputs of gate + circuit, every complete annotation the circuit covers (one
+    operation on two non-negative decimals) has the right value (written value within one unit
+    of its last written place of the exact value). Reported beside the same rate for the gate,
+    with the counts of covered and uncovered annotations.
+  - Q3: on prose_val, code_val and notebooks_val the gate with the circuit is within 0.005 nats
+    of the gate (as step 3's C3).
+  - No pass/fail against the calculator: it covers chained expressions the circuit leaves to the
+    LMs, so we expect it to be at least as accurate; the paper reports the gap and the share of
+    annotations the circuit does not cover.
+  - Also reported: the gate against the best single expert (accuracy and loss), and the error
+    types of the items that gate + circuit gets right and the gate wrong (and the reverse).
+- Failure of Q1 is reported as the result: most GSM8K errors at this size may be reasoning, not
+  arithmetic. If a criterion cannot be read off as written, the deviation is recorded here
+  before the number is used.
+
+**Why the gate's facts loss is high at sc17f (diagnostic added after the results;
+`diag_facts_routing.py`, `results/track_c/diag_facts_routing.json`).** The gate does route plain
+biographies to the facts expert: on facts_val its weight there is 0.90 at both points (gate_conf
+and gate_atom), the facts expert has the largest weight on 91% of tokens, and the weight is the
+same at every position in the window (0.88–0.92); on the biography segments of mixed text it is
+also 0.90. So the gate, trained on mixed text only, never commits more than about 0.9 to one
+expert: that alone costs at least −log 0.9 ≈ 0.105 nats, and the remaining weight goes to experts
+that are very bad on biographies (lang 6.7, code 9.1, math 15.9 nats at sc17f). The gap to the
+facts expert alone is +0.155 at sc16f (0.530 vs 0.375) and +0.466 at sc17f (0.856 vs 0.390): the
+same weights cost more at sc17f. A calibration problem of the gate on unmixed text, not wrong
+routing; the paper says so.

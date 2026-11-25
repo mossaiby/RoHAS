@@ -3,6 +3,7 @@
     python experiments/track_b/cache.py --expert base   # Qwen/Qwen2.5-0.5B
     python experiments/track_b/cache.py --expert coder  # Qwen/Qwen2.5-Coder-0.5B
     python experiments/track_b/cache.py --expert math --step 2 --bs 2   # Qwen/Qwen2.5-Math-1.5B
+    python experiments/track_b/cache.py --expert base15 --step 5        # step 5: base15, coder15, math
 
 Every file (data.py) is cut into non-overlapping windows of 513 tokens (512 inputs and their
 next tokens). For each window and input position the expert's
@@ -26,7 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from experiments.track_b.data import OUT  # noqa: E402
 
 EXPERTS = {"base": "Qwen/Qwen2.5-0.5B", "coder": "Qwen/Qwen2.5-Coder-0.5B", "math": "Qwen/Qwen2.5-Math-1.5B",
-           "base_inst": "Qwen/Qwen2.5-0.5B-Instruct"}             # step 4: the replacement prose expert
+           "base_inst": "Qwen/Qwen2.5-0.5B-Instruct",             # step 4: the replacement prose expert
+           "base15": "Qwen/Qwen2.5-1.5B", "coder15": "Qwen/Qwen2.5-Coder-1.5B"}   # step 5 (with math)
 FILES = ["mixed_train", "prose_val", "code_val", "mixed_blank_val", "mixed_long_val", "mixed_inline_val",
          "mixed_marked_val", "notebooks_val"]
 FILES2 = ["m3_train", "prose_val", "code_val", "math_val", "m3_blank_val", "m3_long_val", "m3_inline_val",
@@ -35,6 +37,7 @@ FILES3 = ["m3c_train", "prose_val", "code_val", "mathc_val", "m3c_blank_val", "m
           "m3c_marked_val", "notebooks_val"]       # step 3 (+ math, GSM8K test halves)
 FILES4 = ["mixed_sub_train", "prose_val", "code_val", "notebooks_val", "mixed_blank_val",
           "mixed_inline_val"]                       # step 4 (swap test); first third of mixed_train
+FILES5 = FILES3 + ["a4_train", "a4_blank_val", "a4_inline_val"]    # step 5 (1.5B experts, GSM8K); a4: the head
 CTX = 512
 CACHE = os.path.join(OUT, "cache")
 
@@ -75,12 +78,12 @@ def main():
     from transformers import AutoModelForCausalLM
     ap = argparse.ArgumentParser()
     ap.add_argument("--expert", required=True, choices=list(EXPERTS))
-    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3, 4])
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3, 4, 5])
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--force", action="store_true", help="recompute files already cached (e.g. deleted hidden states)")
     ap.add_argument("--bs", type=int, default=4)
     a = ap.parse_args()
-    a.files = a.files or {1: FILES, 2: FILES2, 3: FILES3, 4: FILES4}[a.step]
+    a.files = a.files or {1: FILES, 2: FILES2, 3: FILES3, 4: FILES4, 5: FILES5}[a.step]
     os.makedirs(os.path.join(CACHE, a.expert), exist_ok=True)
     model = AutoModelForCausalLM.from_pretrained(EXPERTS[a.expert], torch_dtype=torch.bfloat16).cuda().eval()
     log = {}

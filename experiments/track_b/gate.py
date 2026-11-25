@@ -167,14 +167,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
     ap.add_argument("--experts", nargs="+", default=["base", "coder"])
-    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3, 4])
+    ap.add_argument("--step", type=int, default=1, choices=[1, 2, 3, 4, 5])
     ap.add_argument("--frozen", help="evaluate this trained gate (checkpoint name) over --experts, without training")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--bs", type=int, default=8)
     ap.add_argument("--lr", type=float, default=1e-3)
     a = ap.parse_args()
-    files = {1: FILES, 2: FILES2, 3: FILES3, 4: FILES4}[a.step]
+    files = {1: FILES, 2: FILES2, 3: FILES3, 4: FILES4, 5: FILES3}[a.step]    # 5: the 1.5B experts
     os.makedirs(CKPT, exist_ok=True)
     dims = [load(e, files[1])["h"].shape[-1] for e in a.experts]
     path = os.path.join(CKPT, f"{a.frozen or a.name}.pt")
