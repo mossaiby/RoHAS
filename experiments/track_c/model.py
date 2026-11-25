@@ -21,6 +21,9 @@ SIZES = {
     "s": dict(d=384, layers=8, heads=6),     # about 17M parameters: one expert
     "m": dict(d=768, layers=9, heads=12),    # about 4x: the larger monolithic baseline
     "xs": dict(d=128, layers=2, heads=2),    # smoke tests
+    # the 5e17-FLOP point of the scale study (run_scale.py): about 3x the width-depth of s
+    "s17": dict(d=576, layers=12, heads=9),    # about 52M parameters: one expert
+    "m17": dict(d=1024, layers=16, heads=16),  # about 4x s17: the larger monolithic baseline
 }
 
 

@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from experiments.common import ROOT, save  # noqa: E402
 from experiments.track_c import model as M  # noqa: E402
 
-DATA = os.path.join(ROOT, "data", "track_c")
+DATA = os.path.join(ROOT, "data", os.environ.get("TRACK_C_DATA", "track_c"))
 CKPT = os.path.join(ROOT, "checkpoints", "track_c")
 VAL_SETS = ["lang", "facts", "math", "code", "mixed"]
 
@@ -86,6 +86,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--own", choices=["lang", "facts", "math", "code"],
                     help="loss only on this type's tokens in labelled sources")
+    ap.add_argument("--compile", action="store_true", help="torch.compile the training forward pass")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -97,6 +98,7 @@ def main():
         model.train()
     else:
         model = M.make(args.size, meta["vocab"], args.ctx).to(device)
+    fwd = torch.compile(model) if args.compile else model
     fpt = model.flops_per_token()
     budget = args.tokens if args.tokens else args.flops / fpt
     mix = {k: float(v) for k, v in (m.split("=") for m in args.mix)}
@@ -151,7 +153,7 @@ def main():
                 ys.append(y)
             xy, tgt = torch.cat(xs).to(device), torch.cat(ys).to(device)
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                logits = model(xy[:, :-1])
+                logits = fwd(xy[:, :-1])
             loss = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), tgt.reshape(-1),
                                    ignore_index=-100) / accum
             loss.backward()
@@ -173,7 +175,8 @@ def main():
     save("track_c", f"train_{args.name}",
          {"name": args.name, "size": args.size, "params": model.n_params(), "flops_per_token": fpt,
           "tokens": trained, "flops": fpt * trained, "mix": mix, "lr": lr, "init": args.init, "own": args.own,
-          "steps": steps, "batch_tokens": seqs * args.ctx, "curve": curve, "final": curve[-1]},
+          "steps": steps, "batch_tokens": seqs * args.ctx,
+          "data": os.path.basename(DATA), "compile": args.compile, "curve": curve, "final": curve[-1]},
          seed=args.seed, wall_time=elapsed)
 
 

@@ -881,3 +881,118 @@ full classification of its 534 wrong in-text answers (of 1,800) finds no call in
 that still gives a wrong answer in 29. The varied variant: 190 of 192 without a call. The paper
 now gives these counts from the result file. The 500-step weight of the Track B circuit head
 (0.72) is now stored in circuit_gate.json (head trajectory; the refit is bit-identical).
+
+### Scale study, first step: corpus v2 at 5e16 and 5e17 FLOPs (pre-registered 2026-11-22, before any v2 data or runs)
+
+Goal: test whether the from-scratch results hold at ten times the compute, on real-world prose
+instead of children's stories. Runs on the RTX 3090 machine (`run_scale.py`); the 5e16 runs on
+corpus v1 stay as they are.
+
+- **Data (corpus v2, `data/track_c_v2/`, `data.py --corpus v2`).** Prose: FineWeb-Edu
+  (sample/10BT files 000–001; every 100th document of file 001 is validation, the next the
+  foreign-context pool). Code: codeparrot-clean-train files 1–10 plus codeparrot-clean-valid,
+  the v1 filters and repository split. Biographies (2,000 + 500 people) and synthetic math
+  unchanged. Tokenizer retrained on the v2 sources by the v1 recipe (8,192 tokens, single-digit
+  tokens). About 1.5B training tokens each of prose, code and math, so no budget up to 5e18
+  repeats them. Gate data mixed_train 30M tokens; context-exposure files ctxv_<type>_train
+  42M tokens each (`data_context.py --varied --tokens 42e6`); held-out formats long, inline,
+  marked (`data_mixed_ood.py`).
+- **Two points, the same recipe.** The recipe is that of the 5e16 runs whose results are in the
+  paper: seeded experts (seed on 4fT tokens of the four types, f = 1/2; four branches on (1−f)T
+  tokens, 20% from ctxv_<type> with the loss on their own type only), mono_s (expert size, all
+  four types plus mixed text, at the systems' total FLOPs), mono_m (four times the parameters,
+  same FLOPs), 8,192-token batches, learning rate 1e-3 for expert-size models and 6e-4 for the
+  larger, cosine schedule, one seed. The gate trains on G tokens of mixed_train, and mono_s and
+  mono_m see exactly G tokens of mixed text, as before. The confidence gate (prob) and the
+  two-level atom gate with the compiled circuit and vetoes are trained.
+  - **sc16:** sizes s (17.5M) and m (70M), T = 100M, G = 6M: the 5e16 point on corpus v2.
+  - **sc17:** sizes s17 (52.8M; d 576, 12 layers) and m17 (210M; d 1024, 16 layers),
+    T = 350M, G = 60M: 5.0e17 FLOPs per system. G grows with the budget, so that the gate's and
+    the mixed text's shares of each system stay those of 5e16.
+  - No learning-rate or batch tuning at either point. `torch.compile` is used for training
+    (same arithmetic; it is faster). Independent (unseeded) experts are not run at this step.
+- **Measurements (as in the paper).** evaluate.py: loss per type, fact recall with training and
+  held-out templates, arithmetic and word problems; diag_mixed.py: mixed-text loss on mixed_val
+  (the gate's training format) and on the held-out formats long, inline and marked, with the
+  oracles.
+- **Criteria, tested at sc17 (and reported at sc16):**
+  - S1: the gated ctxv experts (confidence gate, prob) have a lower loss than mono_s on the
+    inline and on the marked held-out formats. This is the paper's main mixed-text claim.
+  - S2: the experts (each on its own type) beat mono_s on prose and on code loss.
+  - S3: fact recall with held-out templates: gated experts at least as high as mono_s.
+  - S4: under the atom gate with vetoes, the arithmetic of evaluate.py is exact (100%) at every
+    digit count.
+  - Whatever the outcome, we report the margins at sc16 and sc17 side by side; the direction of
+    the change is the result of this step, not a pass or fail. If a criterion fails at sc17, the
+    paper says that the claim holds at the smaller scale only.
+
+**Results, 20 biographies per person (`eval_sc16.json`, `eval_sc17.json`, `diag_mixed_*sc1[67].json`;
+finished 2026-11-23).** All four criteria hold at both points. Loss in nats; "mono_s" is the
+expert-size monolithic model.
+
+| | sc16 | sc17 |
+|---|---|---|
+| S1 inline: gate vs mono_s (mono_m) | 2.785 vs 3.045 (3.070) | 2.678 vs 2.794 (2.819) |
+| S1 marked: gate vs mono_s (mono_m) | 2.426 vs 2.601 (2.649) | 2.242 vs 2.361 (2.376) |
+| S2 prose: lang expert vs mono_s | 3.435 vs 3.553 | 3.065 vs 3.225 |
+| S2 code: code expert vs mono_s | 1.836 vs 1.918 | 1.547 vs 1.667 |
+| S3 held-out recall: gate_conf / gate_atom vs mono_s | 0.274 / 0.279 vs 0.042 | 0.238 / 0.267 vs 0.096 |
+| S4 atom gate, answer number exact (`arith_number`) | 100% in every cell | 100% in every cell |
+
+The S1 margins shrink with scale (inline −0.260 → −0.116, marked −0.175 → −0.119); the S2
+margins grow. Under the stricter `arith` score (the generated line is exactly "=" + answer) the
+atom gate is 89% (sc16) and 96% (sc17) over all cells.
+
+**The facts set overfits at sc17 (found after the run).** facts_train is a fixed 2.57M tokens
+(20 biographies per person), so at sc17 the facts expert's path sees it about 120 times and
+mono_s about 140 times. The facts validation loss (fresh biographies of the same people: same
+templates, new orderings) reaches its minimum and then rises in every sc17 run: seed 0.43 → 0.77,
+mono_s 0.41 → 0.81, facts expert 0.48 (first evaluation) → 1.05. The gated system then has the
+worst facts loss at sc17 (1.42, mono_s 0.82, mono_m 0.66), while training-template recall is 100%.
+At sc16 the effect is small (facts expert 0.38 → 0.45). This is a defect of the design: the facts
+set did not grow with the budget. Other deviations: the ctxv own-type shares on v2 differ from v1
+(lang 0.524 instead of 0.316), and the pipeline check's G was cut to 0.02M after its first
+launch, because the larger G gave mono_m a negative mixed weight (`run_scale.py` now asserts
+that G is under half of each monolithic run).
+
+### Scale study, step 1b: a facts set that does not repeat (pre-registered 2026-11-23, before the new data or runs)
+
+- **Data (`data/track_c_v2f/`).** Corpus v2 unchanged (same tokenizer, the same files
+  hard-linked), except facts_train: 600 biographies per person instead of 20 (the same 2,000
+  people, attributes and training templates; new orderings and template choices; about 77M
+  tokens). Built by `data.py --grow-facts track_c_v2 --bios 600`. The facts expert's path then
+  sees each biography of the set about 4 times at sc17 and once at sc16; mono_s about 5 and 1.3
+  times. Evaluation (people, prompts, facts_val) is unchanged.
+- **Runs.** Points 17f and 16f: the sc17 and sc16 configurations exactly, on track_c_v2f, in
+  that order (`run_scale_v2f.sh`). Nothing else changes.
+- **Criteria.** S1–S4 as above, tested at sc17f and reported at sc16f, side by side with sc17
+  and sc16. Added check F: the facts validation loss of the sc17f seed, facts expert and mono_s
+  does not rise by more than 0.05 nats from its minimum to the end of training. If F fails, the
+  overfitting is not only repetition, and we say so.
+- The 20-biography results above stay in the record; the paper uses 16f and 17f.
+
+**Results, 600 biographies per person (`eval_sc1[67]f.json`, `diag_mixed_*sc1[67]f.json`; finished
+2026-11-24).** All four criteria and check F hold at both points.
+
+| | sc16f | sc17f |
+|---|---|---|
+| S1 inline: gate vs mono_s (mono_m) | 2.749 vs 3.010 (3.099) | 2.668 vs 2.794 (2.802) |
+| S1 marked: gate vs mono_s (mono_m) | 2.411 vs 2.581 (2.679) | 2.235 vs 2.352 (2.347) |
+| S2 prose: lang expert vs mono_s | 3.434 vs 3.544 | 3.039 vs 3.212 |
+| S2 code: code expert vs mono_s | 1.833 vs 1.920 | 1.534 vs 1.658 |
+| S3 held-out recall: gate_conf / gate_atom vs mono_s (mono_m) | 0.208 / 0.208 vs 0.026 (0.022) | 0.162 / 0.150 vs 0.074 (0.112) |
+| S4 atom gate, `arith_number` | 100% in every cell | 100% in every cell |
+| Strict `arith`, atom gate: worst cell / mean | 0.78 / 0.99 | 0.96 / 1.00 |
+| F: facts val loss, minimum → end (seed, facts expert, mono_s) | 0.692 → 0.699, 0.376 → 0.376, 0.615 → 0.615 | 0.428 → 0.431, 0.392 → 0.393, 0.409 → 0.416 |
+| Facts loss: facts expert / gate_atom / mono_s / mono_m | 0.375 / 0.530 / 0.606 / 0.828 | 0.390 / 0.856 / 0.417 / 0.384 |
+
+The S1 margins shrink with scale as before (inline −0.261 → −0.126, marked −0.170 → −0.117);
+the S2 margins grow (prose −0.110 → −0.173, code −0.087 → −0.124). Held-out recall is lower than
+with 20 biographies for every system (part of the old recall came from memorising the small set),
+but the gated systems keep about twice mono_s at sc17f and eight times at sc16f. Two results
+against the expert system, to be reported: at sc17f the gate's facts loss (0.856) is twice
+mono_s's (0.417) although the facts expert alone reaches 0.390, so the gate, trained on mixed
+text only, does not hand plain facts documents to the facts expert; and its math loss is
+slightly above mono_s's at both points (0.711 vs 0.706, 0.706 vs 0.694). With the larger facts
+set, sc16f's mono_s and mono_m have higher facts loss than at sc16 (0.606 vs 0.421, 0.828 vs
+0.582): at 5e16 they see each biography about once.

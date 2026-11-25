@@ -16,7 +16,8 @@ touches only the facts expert:
   facts  biographies of fictitious people: names 2,501 onward of the shuffle that gave the
          corpus its 2,500 people (synth.people), so no name is shared with old or new people;
          attributes drawn independently
-  lang   stories from TinyStories train shard 3, which lang_train (shards 0-1) never reached
+  lang   stories from TinyStories train shard 3, which lang_train (shards 0-1) never reached;
+         for corpus v2, the FineWeb-Edu documents data.fineweb("foreign") sets aside
   math   fresh synthetic problems (math stores no items)
   code   training-split files: every one of them is already in code_train, so foreign code
          context reuses the code expert's data (no deletion claim is made for code)
@@ -39,6 +40,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from experiments.track_c import synth  # noqa: E402
+from experiments.track_c import data as D  # noqa: E402
 from experiments.track_c.data import OUT, TYPES, build_mixed, code_files, hub_files, stories  # noqa: E402
 from experiments.track_c.data_mixed_ood import VARIED, build  # noqa: E402
 
@@ -87,10 +89,19 @@ def main():
         n += len(s)
         if n > 25e6:
             break
-    shard3 = [f for f in hub_files("datasets--roneneldan--TinyStories", "data/train-*.parquet")
-              if "train-00003-" in os.path.basename(f)]
-    assert len(shard3) == 1
-    foreign = {"lang": story_sample(shard3), "people": fictitious_people(2000),
+    if D.CORPUS == "v2":                  # FineWeb-Edu documents set aside for this (data.fineweb)
+        flang, n = [], 0
+        for t in D.fineweb("foreign"):
+            flang.append(t)
+            n += len(t)
+            if n > 25e6:
+                break
+    else:
+        shard3 = [f for f in hub_files("datasets--roneneldan--TinyStories", "data/train-*.parquet")
+                  if "train-00003-" in os.path.basename(f)]
+        assert len(shard3) == 1
+        flang = story_sample(shard3)
+    foreign = {"lang": flang, "people": fictitious_people(2000),
                "code": [t for split, t in code_files() if split == "train"]}
     assert not {p["name"] for p in foreign["people"]} & {p["name"] for p in old}
     own = {"lang": ("lang", own_lang), "facts": ("people", old), "math": None, "code": None}
