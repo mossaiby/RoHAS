@@ -89,11 +89,16 @@ def make(size, vocab, ctx=512):
 
 def load(path, device="cuda"):
     ck = torch.load(path, map_location=device, weights_only=False)
-    m = GPT(Config(**ck["config"])).to(device)
+    if ck.get("kind") == "btx":                       # Branch-Train-MiX baseline (btx.py)
+        from experiments.track_c.btx import BTX
+        m = BTX(Config(**ck["config"]), ck["n_experts"], ck["k"]).to(device)
+    else:
+        m = GPT(Config(**ck["config"])).to(device)
     m.load_state_dict(ck["model"])
     m.eval()
     return m, ck
 
 
 def save(path, model, **extra):
-    torch.save({"config": asdict(model.c), "model": model.state_dict(), **extra}, path)
+    torch.save({"config": asdict(model.c), "model": model.state_dict(), **getattr(model, "save_extra", {}), **extra},
+               path)

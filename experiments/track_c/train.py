@@ -94,10 +94,12 @@ def main():
     device = "cuda"
     meta = json.load(open(os.path.join(DATA, "meta.json")))
     if args.init:
-        model, _ = M.load(args.init, device)
+        model, _ck_init = M.load(args.init, device)
         model.train()
     else:
         model = M.make(args.size, meta["vocab"], args.ctx).to(device)
+    if args.compile and hasattr(model, "aux_loss"):
+        raise SystemExit("--compile is not used with BTX (the router loss is read from the modules)")
     fwd = torch.compile(model) if args.compile else model
     fpt = model.flops_per_token()
     budget = args.tokens if args.tokens else args.flops / fpt
@@ -155,7 +157,10 @@ def main():
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 logits = fwd(xy[:, :-1])
             loss = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), tgt.reshape(-1),
-                                   ignore_index=-100) / accum
+                                   ignore_index=-100)
+            if hasattr(model, "aux_loss"):                    # BTX: load balancing of the routers
+                loss = loss + model.aux_loss()
+            loss = loss / accum
             loss.backward()
             loss_acc += loss.item()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -170,7 +175,8 @@ def main():
 
     os.makedirs(CKPT, exist_ok=True)
     trained = steps * seqs * args.ctx
-    M.save(os.path.join(CKPT, f"{args.name}.pt"), model, mix=mix, tokens=trained, init=args.init)
+    M.save(os.path.join(CKPT, f"{args.name}.pt"), model, mix=mix, tokens=trained, init=args.init,
+           **({"experts": _ck_init.get("experts")} if args.init and "experts" in _ck_init else {}))
     elapsed = time.time() - t0
     save("track_c", f"train_{args.name}",
          {"name": args.name, "size": args.size, "params": model.n_params(), "flops_per_token": fpt,

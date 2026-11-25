@@ -1060,3 +1060,57 @@ that are very bad on biographies (lang 6.7, code 9.1, math 15.9 nats at sc17f). 
 facts expert alone is +0.155 at sc16f (0.530 vs 0.375) and +0.466 at sc17f (0.856 vs 0.390): the
 same weights cost more at sc17f. A calibration problem of the gate on unmixed text, not wrong
 routing; the paper says so.
+
+### Scale study: a Branch-Train-MiX baseline (pre-registered 2026-11-25, before any BTX code or runs)
+
+Goal: compare the gate with the closest prior way of combining branched experts. BTX
+(Sukhbaatar et al., 2024) merges experts branched from one seed into a mixture-of-experts model
+and fine-tunes all of it; our experts at sc16f and sc17f are branched from a common seed, so
+they are BTX's "branch-train" stage already, and only the "MiX" stage is new.
+
+- **Merge (`btx.py`).** From sc<pt>_{lang,facts,math,code} (no circuit: BTX has no place for
+  it). In every layer the four feed-forward blocks become the experts of a mixture-of-experts
+  layer with a new linear router (d → 4, initialised N(0, 0.02²)); top-2 routing, the two
+  weights a softmax over the two chosen router logits (as in BTX and Mixtral). All other
+  weights (token and position embeddings, attention, layer norms) are the element-wise mean of
+  the four experts'. Load-balancing loss (Switch Transformer form, E·Σ f_i P_i) with
+  coefficient 0.01, as in BTX.
+- **Fine-tune (`train.py --init`).** All parameters, the expert-size recipe without tuning:
+  learning rate 1e-3, 2% warm-up, cosine to 0.1×, 8,192-token batches. Data: half mixed_train,
+  half the four types in equal shares (BTX fine-tunes on its experts' domains; the mixed half
+  is the data our gate sees). FLOPs per token count the active parameters only (attention,
+  embeddings, two of the four feed-forward blocks, router) by `flops_per_token`'s formula.
+- **Two budgets per point.**
+  - btx: the FLOPs of the gate's training as recorded in train_sc<pt>f_gate_conf.json
+    (1.01e15 at sc16f, 2.90e16 at sc17f). The system's total is then that of the gated system
+    (experts + gate), so this is the compute-matched comparison.
+  - btx10: ten times that. Its total exceeds the budget of the other systems (by about 18% at
+    sc16f and 52% at sc17f; the exact figures are computed from the train files and reported);
+    a generous reference, not compute-matched.
+- **Measurements.** The same as for the other systems: evaluate.py (loss per type, recall,
+  arithmetic, word problems) and diag_mixed.py on mixed_val and the held-out formats.
+- **Comparisons, stated in advance; no pass/fail.** At each point, btx and btx10 against
+  gate_conf (prob) and mono_s:
+  - B1: loss on the inline and marked held-out formats (S1's quantity).
+  - B2: loss on prose, code, facts and math.
+  - B3: held-out-template recall.
+  - B4: arithmetic (`arith_number`), also against gate_atom, which has the circuit.
+  - Whatever the outcome, the paper reports it. If compute-matched BTX beats the gate on B1,
+    the paper says so, and the case for the gate rests on what BTX cannot do without
+    retraining (frozen experts that can be replaced, as in Track B step 4, and compiled
+    circuits as experts).
+- One seed. No router, learning-rate or data-mix tuning; if a run diverges, the deviation is
+  recorded here before any rerun.
+- **Checked before any fine-tuning (2026-11-25, CPU, 4 windows per set).** Sizes: sc16f BTX
+  45.8M parameters, 27.0M active, 179 MFLOP/token (expert 123), so btx trains on 5.63M tokens
+  and btx10 on 56.3M; sc17f 148.4M, 84.7M active, 549 MFLOP/token (expert 358): 52.9M and 529M
+  tokens. The merged sc16f model before fine-tuning has a loss near that of a uniform guess
+  (ln 8192 = 9.01): prose 8.93, code 9.59, mixed 9.38, against 3.59 (lang expert), 1.71 (code
+  expert) and 3.81 (best single expert on mixed). The branches have moved too far from the seed
+  for their attention weights to be averaged, so the fine-tuning has to rebuild the shared
+  layers. This is part of the result (BTX's paper merges experts that stay closer to the seed),
+  and the design is not changed for it.
+- **Deviation (2026-11-25, before the first fine-tune step).** Micro-batch 4 sequences instead of 8
+  (gradient accumulation 4 instead of 2; the same 8,192-token batch, schedule and FLOPs), so the
+  fine-tune fits beside the other jobs on the shared GPU. The load-balancing loss is computed per
+  micro-batch of 2,048 tokens. Wall-clock times of these runs are not comparable to the others.
