@@ -1183,3 +1183,46 @@ points; btx10 is +18.1% (sc16f) and +49.3% (sc17f) above it.
   data-mix changes, as registered).
 - So compute-matched BTX does not beat the gate on B1 at either point; the merged model has to
   rebuild its averaged attention layers (see the check above), which costs most of its budget.
+
+### Scale study, step 2: the 5e18 point (pre-registered 2026-11-26, before any 5e18 data, code or runs)
+
+Goal: the S1–S4 and B1–B4 questions at ten times sc17f's compute. The S1 margins shrank from
+5e16 to 5e17 (inline −0.261 → −0.126); this point tests whether they keep shrinking, close, or
+turn.
+
+- **Sizes (`model.py`).** s18: d 896, 16 layers, 14 heads, 161.9M parameters, 1.057 GFLOP/token
+  (one expert). m18: d 1536, 22 layers, 24 heads, 636M parameters (3.9× s18, as m17/s17 = 4.0),
+  4.02 GFLOP/token. Context 512, vocabulary 8,192 as before.
+- **Budget (`run_scale.py`, point 18f).** T = 1.1B tokens per expert, G = 200M: G/T is that of
+  sc17 (0.17), so mixed text is the same share of the monolithic runs (4.3% of mono_s's tokens).
+  Budget by `run_scale.py`'s formula, about 4.9e18 FLOPs per system: seed 2.2B tokens, each
+  branch 550M, mono_s about 4.67B and mono_m about 1.23B tokens. The exact figures are those of
+  the train files.
+- **Data (`data/track_c_v2g/`).** Corpus v2f, hard-linked, with three sets grown so that no
+  run repeats them more than sc17f's did:
+  - facts_train: 6,000 biographies per person instead of 600 (the same people, attributes and
+    training templates; `data.py --grow-facts track_c_v2 --bios 6000`; about 770M tokens). mono_s
+    sees about 1.5 passes, the seed and facts branch together about 1.3.
+  - mixed_train: 200M tokens instead of 30M, `build_mixed` unchanged (seed 7, same pools), so
+    the gate and the monolithic runs see each mixed document about once.
+  - ctxv_<type>_train: 120M tokens each instead of 42M (`data_context.py --varied --tokens 120e6`);
+    each branch draws 110M from it.
+  - Prose, code and math training files (about 1.5B tokens each) are unchanged; mono_s draws
+    about 1.12B tokens of each. Validation, evaluation and held-out formats are unchanged.
+- **Recipe: unchanged.** Seeded experts (f = 1/2, branches 20% from ctxv with own-type loss),
+  mono_s and mono_m at the systems' total FLOPs, 8,192-token batches, lr 1e-3 (s18) and 6e-4
+  (m18), cosine, one seed, `torch.compile`; confidence gate (prob) and atom gate with the
+  circuit and vetoes on G tokens of mixed_train. The micro-batch is set per model to fit the
+  GPU (same batch, schedule and FLOPs). No learning-rate tuning for the larger models; if a run
+  diverges, the deviation is recorded here before any rerun.
+- **BTX at 18f:** compute-matched only (btx, the FLOPs of train_sc18f_gate_conf.json), the
+  recipe of the BTX section. No btx10: at sc17f it was limited by the data.
+- **Criteria.** S1–S4 and check F as in steps 1 and 1b, tested at sc18f and reported beside
+  sc16f and sc17f; B1–B4 against btx. As before, the direction of the margins across the three
+  points is the result; if S1 fails at sc18f, the paper says the mixed-text claim holds up to
+  5e17 only.
+- **Cost and scheduling.** At sc17f's measured rates (41 TFLOP/s for expert size, 50 for the
+  larger model, 10–26 for the gates, 9 for BTX): seed and branches about 32 h, mono_s 33 h,
+  mono_m 27 h, gates 10 h, btx 9 h, evaluation a few hours; about 5 days in total. The GPU is
+  shared with another project: its queue is told before each long run, and the runs wait for
+  free memory as run_btx.sh does.
