@@ -1049,6 +1049,36 @@ This is a generation benchmark, not a loss.
   arithmetic. If a criterion cannot be read off as written, the deviation is recorded here
   before the number is used.
 
+**Results (2026-11-26; `results/track_b/gsm8k.json`, outputs in `gsm8k_outputs.json` on the
+3090).** Strict accuracy on the 659 odd test items (flexible is the same except math, 0.517):
+
+| System | Accuracy | Covered annotations right | Uncovered right |
+|---|---|---|---|
+| base15 | 0.622 | 1566 / 1579 | 265 / 297 |
+| coder15 | 0.564 | 1580 / 1584 | 263 / 306 |
+| math | 0.514 | 200 / 205 | 46 / 70 |
+| gate | 0.627 | 1401 / 1407 | 240 / 272 |
+| gate + circuit | 0.633 | 1404 / 1404 | 241 / 273 |
+| base15 + circuit | 0.624 | 1575 / 1575 | 268 / 298 |
+| gate + calculator | 0.651 | 1405 / 1406 | 264 / 272 |
+| base15 + calculator | 0.634 | 1576 / 1577 | 292 / 298 |
+
+- Q1 met: gate + circuit − gate = +0.0061, 95% interval [+0.0015, +0.0121]; 4 items gained, none
+  lost. Small: most errors at this size are not in single-operation arithmetic.
+- Q2 met: 1404 of 1404 covered annotations right under gate + circuit (gate 1401 of 1407,
+  99.6%). 273 annotations (16%) are not covered (chained expressions, fractions such as
+  `8*1/2`); the gate gets 88% of those right.
+- Q3 met: gate + circuit − gate is +0.0003 (prose), +0.0004 (code), +0.0002 (notebooks).
+- Calculator: gate + calculator − gate = +0.024 [+0.012, +0.038]; against gate + circuit +0.018
+  [+0.008, +0.030] (14 items vs 2). As expected, the calculator also fixes the chained
+  annotations the circuit leaves alone.
+- Gate against the best single expert (base15): accuracy +0.005 [−0.029, +0.038], not
+  distinguishable (66 items vs 63); loss lower on all three sets (prose 2.473 vs 2.478, code
+  1.245 vs 1.256 for coder15, notebooks 1.619 vs 1.652).
+- The 4 items gained: two decimal-point slips in a product (6 × 0.50 = 30, 16 × 0.03 = 4.80), one
+  subtraction (32 − 30 = −8), and one where the circuit's shorter form (1.4 for 1.40) changed the
+  rest of the solution, which took a different (correct) path. No item was lost.
+
 **Why the gate's facts loss is high at sc17f (diagnostic added after the results;
 `diag_facts_routing.py`, `results/track_c/diag_facts_routing.json`).** The gate does route plain
 biographies to the facts expert: on facts_val its weight there is 0.90 at both points (gate_conf
@@ -1114,3 +1144,42 @@ they are BTX's "branch-train" stage already, and only the "MiX" stage is new.
   (gradient accumulation 4 instead of 2; the same 8,192-token batch, schedule and FLOPs), so the
   fine-tune fits beside the other jobs on the shared GPU. The load-balancing loss is computed per
   micro-batch of 2,048 tokens. Wall-clock times of these runs are not comparable to the others.
+
+**Results (2026-11-26; `eval_sc<pt>_btx.json`, `diag_mixed_*sc<pt>_btx.json`,
+`train_sc<pt>_btx*.json`).** Loss in nats per token (lower is better); recall and arithmetic
+higher is better. Totals with the experts and seed: btx equals the gated system's budget at both
+points; btx10 is +18.1% (sc16f) and +49.3% (sc17f) above it.
+
+| | sc16f: mono_s | gate_conf | btx | btx10 | sc17f: mono_s | gate_conf | btx | btx10 |
+|---|---|---|---|---|---|---|---|---|
+| B1 inline | 3.010 | **2.749** | 2.960 | 2.917 | 2.794 | **2.668** | 2.771 | 2.977 |
+| B1 marked | 2.581 | **2.411** | 2.590 | 2.530 | 2.352 | **2.235** | 2.361 | 2.494 |
+| mixed, blank lines | 2.343 | **2.277** | 2.397 | 2.294 | 2.094 | **2.040** | 2.150 | 2.367 |
+| mixed, long | 2.268 | **2.108** | 2.325 | 2.237 | 2.030 | **1.861** | 2.055 | 2.121 |
+| B2 prose | 3.544 | **3.442** | 3.738 | 3.630 | 3.212 | **3.052** | 3.368 | 3.399 |
+| B2 code | 1.920 | **1.840** | 2.057 | 1.930 | 1.658 | **1.545** | 1.719 | 1.665 |
+| B2 facts | 0.606 | 0.564 | 0.570 | **0.429** | 0.417 | 0.860 | 0.396 | **0.379** |
+| B2 math | **0.706** | 0.722 | 0.727 | 0.711 | **0.694** | 0.710 | 0.711 | **0.694** |
+| B3 held-out recall | 0.026 | **0.208** | 0.023 | 0.117 | 0.074 | **0.162** | 0.034 | 0.035 |
+
+- B1: the gate is better than both BTX budgets at both points, by 0.10–0.21 nats compute-matched
+  (btx). Compute-matched BTX is near mono_s: inline 0.050 (sc16f) and 0.023 (sc17f) better,
+  marked 0.009 worse at both, mixed text with blank lines 0.05–0.06 worse.
+- B2: the gate is better on prose and code; BTX is better on facts at sc17f (0.396 against 0.860,
+  the gate's calibration problem on plain biographies described above) and, as btx10, at sc16f;
+  math is within 0.02 for all systems.
+- B3: the gate recalls held-out-template facts 5–9 times as often as compute-matched BTX (0.208
+  vs 0.023; 0.162 vs 0.034).
+- B4 (`arith_number`, share of exact answers): gate_atom is 100% in every cell at both points.
+  btx and btx10 reach 0% from 7 digits on (+ and −) and at most 6% from 3 digits on (×), like
+  mono_s.
+  Word problems: btx 0.77 / 0.87, btx10 0.86 / 0.99, gate_atom 1.00 / 1.00.
+- btx10 at sc17f is worse than btx on mixed text (blank lines 2.367 vs 2.150) and on B1. Its
+  528.97M fine-tuning tokens repeat mixed_train (30M tokens) 8.8 times: its training loss ends
+  at 1.11 while the mixed validation loss stays at 2.31–2.38 from the first evaluation on and
+  rises over the last tenth (2.313 → 2.357). At sc16f btx10 sees mixed_train 0.94 times. So
+  btx10 at sc17f is limited by the data, not the budget, and is not a useful upper reference;
+  the paper reports it with this reason and makes the comparison with btx. Not rerun (no
+  data-mix changes, as registered).
+- So compute-matched BTX does not beat the gate on B1 at either point; the merged model has to
+  rebuild its averaged attention layers (see the check above), which costs most of its budget.

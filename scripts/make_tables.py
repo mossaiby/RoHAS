@@ -340,6 +340,40 @@ def scale_macros(res):
     return out
 
 
+def btx_macros(res):
+    """Scale study, the Branch-Train-MiX baseline (btx: compute-matched; btx10: ten times the gate's FLOPs)."""
+    out = {}
+    for tag, word in SCALE:
+        e = res.get(f"track_c/eval_{tag}_btx")
+        if not e or not scale_point(res, tag):
+            continue
+        put = lambda k, v, f=fmt3: out.__setitem__(("track_c", f"Scale{word}{k}"), f(v))  # noqa: E731
+        tr = lambda n: res[f"track_c/train_{tag}_{n}"]["data"]  # noqa: E731
+        experts = sum(tr(n)["flops"] for n in ("seed", "lang", "facts", "math", "code"))
+        gate = res[f"track_c/eval_{tag}"]["data"]["systems"][f"gate:{tag}_gate_conf:prob"]
+        p = scale_point(res, tag)
+        for run, K in (("btx", "Btx"), ("btx10", "BtxTen")):   # macro names cannot hold digits
+            s = e["data"]["systems"][f"model:{tag}_{run}"]
+            for f, key in (("", "blank"), ("long", "long"), ("inline", "inline"), ("marked", "marked")):
+                d = res[f"track_c/diag_mixed_{f + '_' if f else ''}{tag}_btx"]["data"]["systems"]
+                v = d[f"{tag}_{run}"]["all"]
+                put(f"{key.capitalize()}{K}", v)
+                put(f"{key.capitalize()}GateOver{K}", v - p[f"{key}_gate"])
+            for t, key in (("lang", "Prose"), ("code", "Code"), ("facts", "Facts"), ("math", "Math")):
+                put(f"{key}{K}", s["loss"][t])
+            put(f"Recall{K}", s["facts_heldout"]["all"])
+            put(f"RecallRatio{K}", p["recall_conf"] / s["facts_heldout"]["all"], lambda z: f"{z:.0f}")
+            put(f"Word{K}", s["word"], fmt2)
+            put(f"Tokens{K}", tr(run)["tokens"], lambda z: f"{z / 1e6:.1f}M")
+            put(f"Overhead{K}Pct", (experts + tr(run)["flops"]) / tr("mono_s")["flops"] - 1, lambda z: f"{abs(100 * z) if abs(z) < 5e-4 else 100 * z:.1f}")
+            put(f"MixedEpochs{K}", tr(run)["tokens"] * tr(run)["mix"]["mixed"] / MIXED_TRAIN_TOKENS, fmt2)
+        put("WordGate", gate["word"], fmt2)
+    return out
+
+
+MIXED_TRAIN_TOKENS = 30000345   # data/track_c_v2f/mixed_train.bin on the 3090: 60,000,690 bytes of uint16
+
+
 def table_track_c_scale(res):
     pts = [(tag, scale_point(res, tag)) for tag, _ in SCALE]
     pts = [(t, p) for t, p in pts if p]
@@ -766,6 +800,49 @@ def track_b_circuit_macros(res):
     return out
 
 
+def gsm8k_macros(res):
+    """Track B step 5: GSM8K accuracy (odd test items) and the circuit's cost on loss."""
+    r = res.get("track_b/gsm8k", {}).get("data", {})
+    out = {}
+    if not r.get("gen"):
+        return out
+    put = lambda k, v, f=fmt3: out.__setitem__(("track_b", f"Gsm{k}"), f(v))  # noqa: E731
+    pct = lambda z: f"{100 * z:.1f}"  # noqa: E731
+    g = r["gen"]
+    for s, K in (("base15", "Base"), ("coder15", "Coder"), ("math", "Math"), ("gate", "Gate"),
+                 ("gate_circuit", "GateCirc"), ("base15_circuit", "BaseCirc"), ("gate_calc", "GateCalc"),
+                 ("base15_calc", "BaseCalc")):
+        if s in g:
+            put(f"Acc{K}", g[s]["strict"], pct)
+            a = g[s]["annotations"]
+            put(f"Cov{K}", a["covered"], lambda z: f"{z:,}")
+            put(f"CovRight{K}", a["covered_correct"], lambda z: f"{z:,}")
+            put(f"Uncov{K}", a["uncovered"], lambda z: f"{z:,}")
+            put(f"UncovRightPct{K}", a["uncovered_correct"] / a["uncovered"], lambda z: f"{100 * z:.0f}")
+    put("Items", g["gate"]["items"], lambda z: f"{z:,}")
+    if "gate_circuit" in g:
+        a = g["gate_circuit"]["annotations"]
+        put("UncovSharePct", a["uncovered"] / (a["covered"] + a["uncovered"]), lambda z: f"{100 * z:.0f}")
+    for pair, K in (("gate->gate_circuit", "CircGain"), ("gate->gate_calc", "CalcGain"),
+                    ("gate_circuit->gate_calc", "CalcOverCirc"), ("base15->gate", "GateOverBase"),
+                    ("base15->base15_circuit", "BaseCircGain")):
+        if pair in r.get("compare", {}):
+            c = r["compare"][pair]
+            put(K, c["diff"], pct)
+            put(K + "Lo", c["lo"], pct)
+            put(K + "Hi", c["hi"], pct)
+            put(K + "Won", c["b_only"], str)
+            put(K + "Lost", c["a_only"], str)
+    L = r.get("loss", {})
+    sets = [(f, K) for f, K in (("prose_val", "Prose"), ("code_val", "Code"), ("notebooks_val", "Notebook")) if f in L]
+    for f, K in sets:
+        put(f"CircCost{K}", L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"], lambda z: f"{z:.4f}")
+    if sets:
+        put("CircCostMax", max(L[f]["loss"]["gate_circuit"] - L[f]["loss"]["gate"] for f, _ in sets),
+            lambda z: f"{z:.4f}")
+    return out
+
+
 B_TABLES = [("track_b_step1", table_track_b_step1), ("track_b_step2", table_track_b_step2),
             ("track_b_circuit", table_track_b_circuit), ("track_b_swap", table_track_b_swap),
             ("track_c_ablation", table_track_c_ablation)]
@@ -790,6 +867,8 @@ def derived_macros(res):
     out.update(track_b_circuit_macros(res))
     out.update(track_b_swap_macros(res))
     out.update(scale_macros(res))
+    out.update(btx_macros(res))
+    out.update(gsm8k_macros(res))
     return out
 
 
